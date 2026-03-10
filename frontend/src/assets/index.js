@@ -27,6 +27,10 @@ import IconSearch from './icons/actions/icon-search.svg';
 // Icônes Actions
 import IconPrinter from './icons/actions/icon-printer.svg';
 
+// Icônes Actions de toggle password visibility
+import IconEye from './icons/actions/icon-eye.svg'; 
+import IconEyeSlash from './icons/actions/icon-eye-slash.svg';
+
 export {
   LogoLab,
   BgLogin,
@@ -44,5 +48,7 @@ export {
   IconDelete,
   IconSearch,
   IconPrinter,
+  IconEye,
+  IconEyeSlash,
 
 };
