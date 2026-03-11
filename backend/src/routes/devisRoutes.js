@@ -122,4 +122,43 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// SUPPRESSION D'UN DEVIS
+router.delete('/:id', async (req, res) => {
+  try {
+    // Vérifier si le devis existe
+    const devis = await Devis.findById(req.params.id);
+    
+    if (!devis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Devis non trouvé'
+      });
+    }
+
+    // Option 1: Suppression logique (changer le statut)
+    devis.statut = 'annule';
+    devis.ajouterHistorique('SUPPRESSION', req.body.userId, { 
+      date: new Date(),
+      raison: 'Suppression manuelle'
+    });
+    
+    await devis.save();
+
+    // Option 2: Suppression physique (vraie suppression)
+    // await Devis.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Devis supprimé avec succès'
+    });
+
+  } catch (err) {
+    console.error('❌ Erreur suppression devis:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la suppression du devis'
+    });
+  }
+});
+
 module.exports = router;
