@@ -22,6 +22,14 @@ const currencies = {
     position: 'before', // symbole avant : $100
     taux: 1.08 // 1 EUR = 1.08 USD (exemple)
   },
+  GNF: { // ✅ AJOUTÉ
+    code: 'GNF',
+    symbole: 'FG',
+    nom: 'Franc guinéen',
+    decimales: 0, // Pas de centimes
+    position: 'after',
+    taux: 12000 // 1 EUR ≈ 12000 GNF (taux approximatif)
+  },
   XOF: {
     code: 'XOF',
     symbole: 'CFA',
@@ -98,8 +106,12 @@ const convertirDevise = (montant, de, vers) => {
   return montantEUR * currencies[vers].taux;
 };
 
+// Exporter aussi la liste des codes pour le frontend
+const currencyCodes = Object.keys(currencies);
+
 module.exports = {
   currencies,
+  currencyCodes,
   formaterMontant,
   convertirDevise
 };

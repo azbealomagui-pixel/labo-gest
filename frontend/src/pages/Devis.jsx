@@ -11,7 +11,24 @@ import useAuth from '../hooks/useAuth';
 import { IconAdd, IconEdit, IconDelete, IconSearch } from '../assets';
 import { genererPDFDevis, ouvrirPDF, telechargerPDF } from '../utils/pdfGenerator';
 import { formatDate } from '../utils/formatters';
-import { formaterMontant } from '../../../backend/src/config/currencies'; // À adapter
+
+
+// ===== FONCTION DE FORMATAGE DES MONTANTS (AJOUTÉE LOCALEMENT) =====
+const formaterMontant = (montant, devise = 'EUR') => {
+  if (montant === undefined || montant === null) return '0 €';
+  
+  try {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: devise,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(montant);
+  } catch (error) {
+    console.error('Erreur formatage montant:', error);
+    return `${montant} ${devise}`;
+  }
+};
 
 const Devis = () => {
   const navigate = useNavigate();
@@ -140,7 +157,7 @@ const Devis = () => {
                     {formatDate(d.dateEmission)}
                   </td>
                   <td className="px-6 py-4 font-medium">
-                    {d.total ? formaterMontant(d.total.valeur, d.devise || 'EUR') : '0 €'}
+                    {formaterMontant(d.total?.valeur || 0, d.devise || 'EUR')}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(d.statut)}`}>
