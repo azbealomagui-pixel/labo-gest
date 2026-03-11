@@ -1,31 +1,35 @@
 // ===========================================
-// FICHIER: src/models/Analyse.js
-// RÔLE: Définir le catalogue des analyses médicales
+// MODÈLE: Analyse
+// RÔLE: Définir la structure d'une analyse médicale
 // ===========================================
 
 const mongoose = require('mongoose');
 
 const analyseSchema = new mongoose.Schema({
-  // Identifiants
+  // ===== IDENTIFIANTS =====
   code: {
     type: String,
-    required: [true, 'Le code de l\'analyse est obligatoire'],
-    unique: true, // Ex: "NFS001", "GLY002"
+    required: [true, 'Le code analyse est obligatoire'],
+    unique: true,
     uppercase: true,
-    trim: true
+    trim: true,
+    maxlength: [20, 'Le code ne peut pas dépasser 20 caractères']
   },
-  
-  // Nom multilingue (pour internationalisation)
+
+  // ===== NOM MULTILINGUE =====
   nom: {
-    fr: { type: String, required: true },
-    en: { type: String },
-    es: { type: String }
+    fr: { 
+      type: String, 
+      required: [true, 'Le nom en français est obligatoire'] 
+    },
+    en: { type: String, default: '' },
+    es: { type: String, default: '' }
   },
-  
-  // Catégorie
+
+  // ===== CATÉGORIE =====
   categorie: {
     type: String,
-    required: true,
+    required: [true, 'La catégorie est obligatoire'],
     enum: [
       'Hématologie',
       'Biochimie',
@@ -36,88 +40,75 @@ const analyseSchema = new mongoose.Schema({
       'Virologie',
       'Immunologie',
       'Autre'
-    ]
+    ],
+    default: 'Biochimie'
   },
 
-
-  // NOUVEAU : Prix dans différentes devises
+  // ===== PRIX =====
   prix: {
-    // Prix par défaut (en devise du laboratoire)
-    valeur: { type: Number, required: true },
-    devise: { type: String, required: true },
-    
-    // Prix optionnels dans d'autres devises
-    alternatives: [{
-      devise: String,
-      valeur: Number,
-      dateMiseAJour: { type: Date, default: Date.now }
-    }]
-  },
-  
-  // Prix et facturation
-  prixUnitaire: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  
-  // Unités de mesure
-  uniteMesure: {
-    type: String,
-    required: true, // ex: "g/L", "mmol/L", "UI/mL"
-    default: "-"
-  },
-  
-  // Valeurs de référence (selon âge/sexe)
-  valeursReference: {
-    homme: {
-      min: { type: Number },
-      max: { type: Number },
-      texte: { type: String } // Alternative si texte libre
+    valeur: {
+      type: Number,
+      required: [true, 'Le prix est obligatoire'],
+      min: [0, 'Le prix ne peut pas être négatif']
     },
-    femme: {
-      min: { type: Number },
-      max: { type: Number },
-      texte: { type: String }
-    },
-    enfant: {
-      min: { type: Number },
-      max: { type: Number },
-      texte: { type: String }
-    },
-    nouveauNe: {
-      min: { type: Number },
-      max: { type: Number },
-      texte: { type: String }
+    devise: {
+      type: String,
+      default: 'EUR',
+      enum: ['EUR', 'USD', 'XOF']
     }
   },
-  
-  // Valeurs aberrantes (alerte)
-  valeursAlertes: {
-    min: { type: Number },
-    max: { type: Number }
+
+  // ===== UNITÉ DE MESURE =====
+  uniteMesure: {
+    type: String,
+    default: '-',
+    trim: true
   },
-  
-  // Délai de rendu (en heures)
-  delaiRendu: {
-    type: Number,
-    default: 24
-  },
-  
-  // Tube/Échantillon requis
+
+  // ===== TYPE D'ÉCHANTILLON =====
   typeEchantillon: {
     type: String,
+    required: [true, "Le type d'échantillon est obligatoire"],
     enum: ['Sang', 'Urine', 'Selles', 'LCR', 'Prélèvement', 'Autre'],
-    required: true
+    default: 'Sang'
   },
-  
-  // Instructions spéciales
+
+  // ===== DÉLAI DE RENDU =====
+  delaiRendu: {
+    type: Number,
+    default: 24,  // Valeur par défaut
+    min: [1, 'Le délai minimum est de 1 heure'],
+    max: [720, 'Le délai maximum est de 30 jours']
+    // PAS DE "required" car optionnel
+  },
+
+  // ===== INSTRUCTIONS =====
   instructions: {
     type: String,
-    default: ""
+    default: '',
+    maxlength: [500, 'Les instructions ne peuvent pas dépasser 500 caractères']
   },
-  
-  // Liens
+
+  // ===== VALEURS DE RÉFÉRENCE =====
+  valeursReference: {
+    homme: {
+      min: Number,
+      max: Number,
+      texte: String
+    },
+    femme: {
+      min: Number,
+      max: Number,
+      texte: String
+    },
+    enfant: {
+      min: Number,
+      max: Number,
+      texte: String
+    }
+  },
+
+  // ===== LIENS =====
   laboratoireId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Laboratoire',
@@ -129,18 +120,23 @@ const analyseSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  
-  // Statut
+
+  // ===== STATUT =====
   actif: {
     type: Boolean,
     default: true
   }
+
 }, {
-  timestamps: true
+  timestamps: true,  // Ajoute createdAt et updatedAt automatiquement
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Index pour la recherche rapide
-//analyseSchema.index({ code: 1 });
-analyseSchema.index({ 'nom.fr': 'text', 'nom.en': 'text', 'nom.es': 'text' });
+// ===== INDEX POUR OPTIMISER LES RECHERCHES =====
+analyseSchema.index({ code: 1 });                    // Recherche par code
+analyseSchema.index({ laboratoireId: 1 });           // Filtre par laboratoire
+analyseSchema.index({ categorie: 1 });               // Filtre par catégorie
+analyseSchema.index({ 'nom.fr': 'text' });           // Recherche textuelle
 
 module.exports = mongoose.model('Analyse', analyseSchema);
