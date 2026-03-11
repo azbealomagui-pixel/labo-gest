@@ -18,10 +18,7 @@ const analyseSchema = new mongoose.Schema({
 
   // ===== NOM MULTILINGUE =====
   nom: {
-    fr: { 
-      type: String, 
-      required: [true, 'Le nom en français est obligatoire'] 
-    },
+    fr: { type: String, default: '' },
     en: { type: String, default: '' },
     es: { type: String, default: '' }
   },
@@ -76,10 +73,9 @@ const analyseSchema = new mongoose.Schema({
   // ===== DÉLAI DE RENDU =====
   delaiRendu: {
     type: Number,
-    default: 24,  // Valeur par défaut
+    default: 24,
     min: [1, 'Le délai minimum est de 1 heure'],
     max: [720, 'Le délai maximum est de 30 jours']
-    // PAS DE "required" car optionnel
   },
 
   // ===== INSTRUCTIONS =====
@@ -87,25 +83,6 @@ const analyseSchema = new mongoose.Schema({
     type: String,
     default: '',
     maxlength: [500, 'Les instructions ne peuvent pas dépasser 500 caractères']
-  },
-
-  // ===== VALEURS DE RÉFÉRENCE =====
-  valeursReference: {
-    homme: {
-      min: Number,
-      max: Number,
-      texte: String
-    },
-    femme: {
-      min: Number,
-      max: Number,
-      texte: String
-    },
-    enfant: {
-      min: Number,
-      max: Number,
-      texte: String
-    }
   },
 
   // ===== LIENS =====
@@ -128,15 +105,13 @@ const analyseSchema = new mongoose.Schema({
   }
 
 }, {
-  timestamps: true,  // Ajoute createdAt et updatedAt automatiquement
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  timestamps: true
 });
 
 // ===== INDEX POUR OPTIMISER LES RECHERCHES =====
-analyseSchema.index({ code: 1 });                    // Recherche par code
-analyseSchema.index({ laboratoireId: 1 });           // Filtre par laboratoire
-analyseSchema.index({ categorie: 1 });               // Filtre par catégorie
-analyseSchema.index({ 'nom.fr': 'text' });           // Recherche textuelle
+analyseSchema.index({ code: 1 });
+analyseSchema.index({ laboratoireId: 1 });
+analyseSchema.index({ categorie: 1 });
+analyseSchema.index({ 'nom.fr': 'text' });
 
 module.exports = mongoose.model('Analyse', analyseSchema);

@@ -3,12 +3,13 @@
 // RÔLE: Création/édition d'une analyse
 // ===========================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
 import AnalyseCodeField from '../components/analyses/AnalyseCodeField';
+import Fuse from 'fuse.js'; // Pour la recherche floue
 
 // Liste des catégories (extensible)
 const CATEGORIES = [
@@ -23,22 +24,49 @@ const CATEGORIES = [
   'Autre'
 ];
 
+// Configuration de la recherche floue
+const fuseOptions = {
+  includeScore: true,
+  threshold: 0.3,
+  keys: ['name']
+};
+
 const AnalyseForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  // La langue sera utilisée plus tard pour l'internationalisation
+  const [categorySearch, setCategorySearch] = useState('');
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  
   const [formData, setFormData] = useState({
     code: '',
     nom: { fr: '', en: '', es: '' },
     categorie: 'Hématologie',
     prix: { valeur: 0, devise: 'EUR' },
-    uniteMesure: '',
     typeEchantillon: 'Sang',
     delaiRendu: 24,
     instructions: ''
   });
+
+  // Préparer les données pour la recherche floue
+  const categoryItems = useMemo(() => 
+    CATEGORIES.map(cat => ({ name: cat })), []
+  );
+
+  // Initialiser Fuse
+  const fuse = useMemo(() => 
+    new Fuse(categoryItems, fuseOptions), [categoryItems]
+  );
+
+  // Obtenir les suggestions de catégories
+  const getCategorySuggestions = () => {
+    if (!categorySearch.trim()) return CATEGORIES;
+    const results = fuse.search(categorySearch);
+    return results.map(r => r.item.name);
+  };
+
+  const suggestions = getCategorySuggestions();
 
   // Charger les données en mode édition
   useEffect(() => {
@@ -92,9 +120,19 @@ const AnalyseForm = () => {
         prix: { ...prev.prix, valeur: parseFloat(value) || 0 }
       }));
     }
+    else if (name === 'categorie') {
+      setFormData(prev => ({ ...prev, categorie: value }));
+      setCategorySearch(value);
+    }
     else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleCategorySelect = (category) => {
+    setFormData(prev => ({ ...prev, categorie: category }));
+    setCategorySearch(category);
+    setShowCategorySuggestions(false);
   };
 
   const handleSubmit = async (e) => {
@@ -104,9 +142,12 @@ const AnalyseForm = () => {
     try {
       const dataToSend = {
         ...formData,
+        uniteMesure: '-',
         laboratoireId: user?.laboratoireId,
         createdBy: user?._id
       };
+
+      console.log('📤 Données envoyées:', JSON.stringify(dataToSend, null, 2));
 
       if (id) {
         await api.put(`/analyses/${id}`, dataToSend);
@@ -168,20 +209,19 @@ const AnalyseForm = () => {
               required={true}
             />
 
-            {/* Noms multilingues */}
+            {/* Noms multilingues (optionnels) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Nom (FR) *
+                  Nom (FR)
                 </label>
                 <input
                   type="text"
                   name="nom.fr"
                   value={formData.nom.fr}
                   onChange={handleChange}
-                  required
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                  placeholder="Nom en français"
+                  placeholder="Nom en français (optionnel)"
                 />
               </div>
               <div>
@@ -193,7 +233,7 @@ const AnalyseForm = () => {
                   name="nom.en"
                   value={formData.nom.en}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 bg-gray-50"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                   placeholder="Nom en anglais (optionnel)"
                 />
               </div>
@@ -206,85 +246,105 @@ const AnalyseForm = () => {
                   name="nom.es"
                   value={formData.nom.es}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 bg-gray-50"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                   placeholder="Nom en espagnol (optionnel)"
                 />
               </div>
             </div>
 
-            {/* Catégorie et prix */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Catégorie *
-                </label>
-                <select
-                  name="categorie"
-                  value={formData.categorie}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                >
-                  {CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+            {/* Catégorie avec autocomplétion */}
+            <div className="relative">
+              <label className="block text-sm font-medium mb-2">
+                Catégorie *
+              </label>
+              <input
+                type="text"
+                name="categorie"
+                value={categorySearch || formData.categorie}
+                onChange={(e) => {
+                  setCategorySearch(e.target.value);
+                  setFormData(prev => ({ ...prev, categorie: e.target.value }));
+                }}
+                onFocus={() => setShowCategorySuggestions(true)}
+                onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
+                required
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                placeholder="Tapez ou sélectionnez une catégorie"
+                autoComplete="off"
+              />
+              
+              {/* Suggestions dropdown */}
+              {showCategorySuggestions && suggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                      onClick={() => handleCategorySelect(cat)}
+                    >
+                      {cat}
+                    </button>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Prix (€) *
-                </label>
-                <input
-                  type="number"
-                  name="prix.valeur"
-                  value={formData.prix.valeur}
-                  onChange={handleChange}
-                  required
-                  min="0"
-                  step="0.01"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Type échantillon et délai */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Type échantillon *
-                </label>
-                <select
-                  name="typeEchantillon"
-                  value={formData.typeEchantillon}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="Sang">Sang</option>
-                  <option value="Urine">Urine</option>
-                  <option value="Selles">Selles</option>
-                  <option value="LCR">LCR</option>
-                  <option value="Prélèvement">Prélèvement</option>
-                  <option value="Autre">Autre</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Délai (heures)
-                </label>
-                <input
-                  type="number"
-                  name="delaiRendu"
-                  value={formData.delaiRendu}
-                  onChange={handleChange}
-                  min="1"
-                  max="720"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+            {/* Prix */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Prix (€) *
+              </label>
+              <input
+                type="number"
+                name="prix.valeur"
+                value={formData.prix.valeur}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+              />
             </div>
 
-            {/* Instructions */}
+            {/* Type échantillon */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Type échantillon *
+              </label>
+              <select
+                name="typeEchantillon"
+                value={formData.typeEchantillon}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="Sang">Sang</option>
+                <option value="Urine">Urine</option>
+                <option value="Selles">Selles</option>
+                <option value="LCR">LCR</option>
+                <option value="Prélèvement">Prélèvement</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
+
+            {/* Délai (optionnel) */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Délai (heures)
+              </label>
+              <input
+                type="number"
+                name="delaiRendu"
+                value={formData.delaiRendu}
+                onChange={handleChange}
+                min="1"
+                max="720"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+
+            {/* Instructions (optionnel) */}
             <div>
               <label className="block text-sm font-medium mb-2">
                 Instructions

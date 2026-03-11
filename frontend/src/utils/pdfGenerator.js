@@ -1,50 +1,83 @@
 // ===========================================
 // UTILITAIRE: pdfGenerator.js
-// RÔLE: Générer des PDF professionnels pour devis
+// RÔLE: Générer des PDF pour devis et factures
 // ===========================================
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// ===== FONCTIONS D'EXPORT =====
+
 /**
- * Formate une date pour l'affichage dans le PDF
- * @param {string|Date} date - La date à formater
- * @returns {string} Date formatée (JJ/MM/AAAA)
+ * Ouvre le PDF dans un nouvel onglet
  */
-const formatDateForPDF = (date) => {
-  if (!date) return 'Non spécifiée';
+export const ouvrirPDF = (doc) => {
   try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return 'Date invalide';
-    return d.toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  } catch {
-    return 'Date invalide';
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+  } catch (error) {
+    console.error('Erreur ouverture PDF:', error);
+    alert('Impossible d\'ouvrir le PDF');
   }
 };
+
+/**
+ * Télécharge le PDF
+ */
+export const telechargerPDF = (doc, nomFichier = 'document.pdf') => {
+  try {
+    doc.save(nomFichier);
+  } catch (error) {
+    console.error('Erreur téléchargement PDF:', error);
+    alert('Impossible de télécharger le PDF');
+  }
+};
+
+/**
+ * Imprime le PDF
+ */
+export const imprimerPDF = (doc) => {
+  try {
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(pdfUrl, '_blank');
+    
+    if (printWindow) {
+      setTimeout(() => {
+        printWindow.print();
+      }, 1000);
+    } else {
+      alert('Veuillez autoriser les popups pour imprimer');
+    }
+  } catch (error) {
+    console.error('Erreur impression PDF:', error);
+    alert('Impossible d\'imprimer le PDF');
+  }
+};
+
+// ===== FONCTION PRINCIPALE =====
 
 /**
  * Génère un PDF de devis
  * @param {Object} devis - Les données du devis
  * @param {Object} laboratoire - Infos du laboratoire
+ * @returns {Object} L'instance jsPDF pour utilisation ultérieure
  */
 export const genererPDFDevis = (devis, laboratoire) => {
   try {
-    // Création du document
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     
     // ===== EN-TÊTE =====
     doc.setFontSize(24);
-    doc.setTextColor(37, 99, 235); // Bleu primaire
+    doc.setTextColor(37, 99, 235);
     doc.text('LABOGEST', 14, 20);
     
     doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99); // Gris
+    doc.setTextColor(75, 85, 99);
     doc.text('Application de gestion de laboratoire', 14, 28);
     
     // ===== INFOS LABORATOIRE =====
@@ -65,8 +98,8 @@ export const genererPDFDevis = (devis, laboratoire) => {
     
     doc.setFontSize(10);
     doc.setTextColor(75, 85, 99);
-    doc.text(`Date: ${formatDateForPDF(devis.dateEmission)}`, pageWidth - 14, 50, { align: 'right' });
-    doc.text(`Valable jusqu'au: ${formatDateForPDF(devis.dateValidite)}`, pageWidth - 14, 58, { align: 'right' });
+    doc.text(`Date: ${new Date(devis.dateEmission).toLocaleDateString('fr-FR')}`, pageWidth - 14, 50, { align: 'right' });
+    doc.text(`Valable jusqu'au: ${new Date(devis.dateValidite).toLocaleDateString('fr-FR')}`, pageWidth - 14, 58, { align: 'right' });
     
     // ===== INFOS PATIENT =====
     doc.setFontSize(12);
@@ -75,8 +108,6 @@ export const genererPDFDevis = (devis, laboratoire) => {
     
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    
-    // Gestion sécurisée du nom du patient
     const patientNom = devis.patientId?.nom || '';
     const patientPrenom = devis.patientId?.prenom || '';
     doc.text(`${patientNom} ${patientPrenom}`.trim() || 'Patient non spécifié', 14, 93);
@@ -102,7 +133,6 @@ export const genererPDFDevis = (devis, laboratoire) => {
       ];
     });
     
-    // Si pas de données, ajouter une ligne par défaut
     if (tableData.length === 0) {
       tableData.push(['-', 'Aucune analyse', '0', '0 €', '0 €']);
     }
@@ -157,8 +187,6 @@ export const genererPDFDevis = (devis, laboratoire) => {
       doc.setFontSize(9);
       doc.setTextColor(75, 85, 99);
       doc.text('Notes:', 14, finalY + 30);
-      
-      // Gestion du texte long
       const splitNotes = doc.splitTextToSize(devis.notes, pageWidth - 40);
       doc.text(splitNotes, 14, finalY + 38);
     }
@@ -173,16 +201,11 @@ export const genererPDFDevis = (devis, laboratoire) => {
       { align: 'center' }
     );
     
-    // ===== OUVERTURE DU PDF =====
-    const pdfBlob = doc.output('blob');
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    window.open(pdfUrl, '_blank');
-    
-    // Nettoyage après 1 seconde
-    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+    return doc;
     
   } catch (error) {
     console.error('❌ Erreur génération PDF:', error);
     alert('Erreur lors de la génération du PDF. Veuillez réessayer.');
+    return null;
   }
 };

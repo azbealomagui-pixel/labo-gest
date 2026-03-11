@@ -1,14 +1,15 @@
-// ===================
-// PAGE: Devis 
-// ===================
+// ===========================================
+// PAGE: Devis
+// RÔLE: Liste et gestion des devis/factures
+// ===========================================
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
-import { IconAdd, IconEdit, IconDelete, IconSearch, IconPrinter } from '../assets';
-import { genererPDFDevis } from '../utils/pdfGenerator';
+import { IconAdd, IconEdit, IconDelete, IconSearch } from '../assets';
+import { genererPDFDevis, ouvrirPDF, telechargerPDF } from '../utils/pdfGenerator';
 import { formatDate } from '../utils/formatters';
 
 const Devis = () => {
@@ -19,7 +20,7 @@ const Devis = () => {
   const [filter, setFilter] = useState('tous');
   const [laboratoire, setLaboratoire] = useState(null);
 
-  // Effet pour charger les devis (corrigé)
+  // Effet pour charger les devis
   useEffect(() => {
     const fetchDevis = async () => {
       try {
@@ -34,7 +35,7 @@ const Devis = () => {
     };
 
     fetchDevis();
-  }, [user?.laboratoireId]); // ← Notez le "?" pour éviter l'erreur si user est null
+  }, [user?.laboratoireId]);
 
   // Effet pour charger les infos du laboratoire
   useEffect(() => {
@@ -50,23 +51,7 @@ const Devis = () => {
     if (user?.laboratoireId) {
       fetchLabo();
     }
-  }, [user?.laboratoireId]); // Dépendance correcte
-
-  // Supprimer un devis
-const handleDelete = async (id) => {
-  if (!window.confirm('Voulez-vous vraiment supprimer ce devis ?')) return;
-  
-  try {
-    await api.delete(`/devis/${id}`);
-    toast.success('Devis supprimé');
-    // Recharger la liste
-    const response = await api.get(`/devis/labo/${user.laboratoireId}`);
-    setDevis(response.data.devis || []);
-    } catch (err) {
-    console.error('Erreur suppression devis:', err);
-    toast.error('Erreur lors de la suppression');
-    }
-  };
+  }, [user?.laboratoireId]);
 
   const getStatusBadge = (statut) => {
     const styles = {
@@ -106,7 +91,8 @@ const handleDelete = async (id) => {
           <h1 className="text-2xl font-bold text-gray-900">Devis & Factures</h1>
           <button
             onClick={() => navigate('/devis/new')}
-            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+          >
             <img src={IconAdd} alt="" className="w-5 h-5" />
             Nouveau devis
           </button>
@@ -118,7 +104,8 @@ const handleDelete = async (id) => {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg">
+              className="px-4 py-2 border rounded-lg"
+            >
               <option value="tous">Tous les statuts</option>
               <option value="brouillon">Brouillon</option>
               <option value="envoye">Envoyé</option>
@@ -149,7 +136,7 @@ const handleDelete = async (id) => {
                     {d.patientId?.nom} {d.patientId?.prenom}
                   </td>
                   <td className="px-6 py-4">
-                    {formatDate(d.dateEmission)}  {/* ← NOUVELLE LIGNE */}
+                    {formatDate(d.dateEmission)}
                   </td>
                   <td className="px-6 py-4 font-medium">
                     {d.totalFormatte || `${d.total?.valeur || 0} €`}
@@ -161,26 +148,42 @@ const handleDelete = async (id) => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      {/* Bouton modifier */}
+                      {/* Bouton Voir/Modifier */}
                       <button
                         onClick={() => navigate(`/devis/${d._id}`)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        title="Voir/Modifier le devis">
-                        <img src={IconEdit} alt="Modifier" className="w-5 h-5" />
+                        title="Voir le devis"
+                      >
+                        <img src={IconEdit} alt="Voir" className="w-5 h-5" />
                       </button>
-                      {/* Bouton PDF */}
+                      
+                      {/* Bouton Ouvrir le PDF */}
                       <button
-                        onClick={() => genererPDFDevis(d, laboratoire)}
+                        onClick={() => {
+                          const doc = genererPDFDevis(d, laboratoire);
+                          if (doc) ouvrirPDF(doc);
+                        }}
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                        title="Ouvrir le PDF"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
+                      
+                      {/* Bouton Télécharger le PDF */}
+                      <button
+                        onClick={() => {
+                          const doc = genererPDFDevis(d, laboratoire);
+                          if (doc) telechargerPDF(doc, `devis-${d.numero}.pdf`);
+                        }}
                         className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
-                        title="Télécharger PDF">
-                        <img src={IconPrinter} alt="PDF" className="w-5 h-5" />
-                      </button>
-                       {/* Bouton supprimer */}
-                      <button
-                        onClick={() => handleDelete(d._id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        title="Supprimer le devis">
-                        <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
+                        title="Télécharger le PDF"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
                       </button>
                     </div>
                   </td>
