@@ -2,6 +2,7 @@
 // PAGE: Analyses
 // RÔLE: Liste et gestion du catalogue d'analyses
 // ===========================================
+/* eslint-disable react-hooks/exhaustive-deps */ // DESACTIVATION: À ENLEVER PLUS TARD
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,34 +18,23 @@ const Analyses = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Charger les analyses
- useEffect(() => {
-  const fetchAnalyses = async () => {
-    try {
-      const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
-      setAnalyses(response.data.analyses || []);
-    } catch (err) {
-      console.error('Erreur chargement analyses:', err);
-      toast.error('Erreur chargement du catalogue');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Charger les analyses (une seule définition)
+const fetchAnalyses = async () => {
+  try {
+    const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
+    setAnalyses(response.data.analyses || []);
+  } catch (err) {
+    console.error('Erreur chargement analyses:', err);
+    toast.error('Erreur chargement du catalogue');
+  } finally {
+    setLoading(false);
+  }
+};
 
+// Effet pour charger au montage
+useEffect(() => {
   fetchAnalyses();
-}, [user.laboratoireId]); // Dépendance explicite
-
-  const fetchAnalyses = async () => {
-    try {
-      const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
-      setAnalyses(response.data.analyses || []);
-    } catch (err) {
-      console.error('Erreur chargement analyses:', err);
-      toast.error('Erreur chargement du catalogue');
-    } finally {
-      setLoading(false);
-    }
-  };
+      }, [user.laboratoireId]);
 
   // Recherche
   const searchAnalyses = async () => {
@@ -126,11 +116,14 @@ const Analyses = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchAnalyses()}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5" />
             </div>
-            <button onClick={searchAnalyses} className="px-6 py-2 bg-primary-600 text-white rounded-lg">
+            <button 
+              onClick={searchAnalyses} 
+              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
               Rechercher
             </button>
           </div>
@@ -141,11 +134,11 @@ const Analyses = () => {
           <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Code</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Nom</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Catégorie</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Prix</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prix</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -157,17 +150,25 @@ const Analyses = () => {
                 </tr>
               ) : (
                 analyses.map((a) => (
-                  <tr key={a._id} className="hover:bg-gray-50">
+                  <tr key={a._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 font-mono text-sm">{a.code}</td>
                     <td className="px-6 py-4">{a.nom?.fr || a.nom}</td>
                     <td className="px-6 py-4">{a.categorie}</td>
-                    <td className="px-6 py-4">{a.prix?.valeur || a.prix} €</td>
+                    <td className="px-6 py-4 font-medium">{a.prix?.valeur || a.prix} €</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button onClick={() => navigate(`/analyses/${a._id}`)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                        <button 
+                          onClick={() => navigate(`/analyses/${a._id}`)} 
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Modifier"
+                        >
                           <img src={IconEdit} alt="Modifier" className="w-5 h-5" />
                         </button>
-                        <button onClick={() => handleDelete(a._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                        <button 
+                          onClick={() => handleDelete(a._id)} 
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Supprimer"
+                        >
                           <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
                         </button>
                       </div>

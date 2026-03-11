@@ -9,6 +9,7 @@ import api from '../services/api';
 import useAuth from '../hooks/useAuth';
 import { IconAdd, IconEdit, IconDelete, IconSearch, IconPrinter } from '../assets';
 import { genererPDFDevis } from '../utils/pdfGenerator';
+import { formatDate } from '../utils/formatters';
 
 const Devis = () => {
   const navigate = useNavigate();
@@ -89,8 +90,7 @@ const Devis = () => {
           <h1 className="text-2xl font-bold text-gray-900">Devis & Factures</h1>
           <button
             onClick={() => navigate('/devis/new')}
-            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
-          >
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
             <img src={IconAdd} alt="" className="w-5 h-5" />
             Nouveau devis
           </button>
@@ -102,8 +102,7 @@ const Devis = () => {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg"
-            >
+              className="px-4 py-2 border rounded-lg">
               <option value="tous">Tous les statuts</option>
               <option value="brouillon">Brouillon</option>
               <option value="envoye">Envoyé</option>
@@ -134,7 +133,7 @@ const Devis = () => {
                     {d.patientId?.nom} {d.patientId?.prenom}
                   </td>
                   <td className="px-6 py-4">
-                    {new Date(d.dateEmission).toLocaleDateString()}
+                    {formatDate(d.dateEmission)}  {/* ← NOUVELLE LIGNE */}
                   </td>
                   <td className="px-6 py-4 font-medium">
                     {d.totalFormatte || `${d.total?.valeur || 0} €`}
