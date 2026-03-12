@@ -43,7 +43,12 @@ const patientRoutes = require('./src/routes/patientRoutes');
 const analyseRoutes = require('./src/routes/analyseRoutes');
 const devisRoutes = require('./src/routes/devisRoutes');
 const statsRoutes = require('./src/routes/statsRoutes');
-const ficheAnalyseRoutes = require('./routes/ficheAnalyseRoutes');
+const ficheAnalyseRoutes = require('./src/routes/ficheAnalyseRoutes');
+
+
+
+
+
 
 // 2. UTILISER les routes
 app.use('/api/users', userRoutes);
