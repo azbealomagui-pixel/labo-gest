@@ -75,18 +75,18 @@ const FicheAnalyseForm = () => {
     }
 
     const analyse = analyses.find(a => 
-      a.code.toLowerCase() === code.toLowerCase()
-    );
-    
-    if (analyse) {
-      setCurrentAnalyse({
-        id: analyse._id,
-        code: analyse.code,
-        nom: analyse.nom?.fr || analyse.nom,
-        categorie: analyse.categorie,
-        prixUnitaire: analyse.prix?.valeur || 0,
-        devise: analyse.prix?.devise || 'EUR'
-      });
+  a.code.toLowerCase() === code.toLowerCase()
+);
+
+if (analyse) {
+  setCurrentAnalyse({
+    id: analyse._id,
+    code: analyse.code,
+    nom: analyse.nom?.fr || analyse.nom,
+    categorie: analyse.categorie,
+    prixUnitaire: analyse.prix?.valeur || 0,  // ← PRIX AUTOMATIQUE
+    devise: analyse.prix?.devise || 'EUR'
+  });
       toast.success(`Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
     } else {
       setCurrentAnalyse(null);
@@ -122,10 +122,6 @@ const FicheAnalyseForm = () => {
     toast.success('Analyse ajoutée à la liste');
   };
 
-  // Supprimer une analyse de la liste
-  const removeAnalyse = (index) => {
-    setSelectedAnalyses(selectedAnalyses.filter((_, i) => i !== index));
-  };
 
   // Calculer le total général
   const calculerTotalGeneral = () => {
@@ -333,6 +329,7 @@ const FicheAnalyseForm = () => {
                   <table className="min-w-full">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-4 py-2 text-left">#</th>
                         <th className="px-4 py-2 text-left">Code</th>
                         <th className="px-4 py-2 text-left">Analyse</th>
                         <th className="px-4 py-2 text-left">Catégorie</th>
@@ -344,17 +341,38 @@ const FicheAnalyseForm = () => {
                     </thead>
                     <tbody>
                       {selectedAnalyses.map((a, index) => (
-                        <tr key={index} className="border-t">
+                        <tr key={index} className={`border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <td className="px-4 py-2 text-sm text-gray-500">{index + 1}</td>
                           <td className="px-4 py-2 font-mono text-sm">{a.code}</td>
                           <td className="px-4 py-2">{a.nom}</td>
                           <td className="px-4 py-2">{a.categorie}</td>
-                          <td className="px-4 py-2 text-right">{a.prixUnitaire} {a.devise}</td>
-                          <td className="px-4 py-2 text-center">{a.quantite}</td>
-                          <td className="px-4 py-2 text-right font-medium">{a.prixTotal} {a.devise}</td>
+                          <td className="px-4 py-2 text-right">{a.prixUnitaire.toLocaleString()} {a.devise}</td>
+                          <td className="px-4 py-2 text-center">
+                            <input
+                              type="number"
+                              min="1"
+                              value={a.quantite}
+                              onChange={(e) => {
+                                const newQuantite = parseInt(e.target.value) || 1;
+                                const updatedList = [...selectedAnalyses];
+                                updatedList[index].quantite = newQuantite;
+                                updatedList[index].prixTotal = newQuantite * a.prixUnitaire;
+                                setSelectedAnalyses(updatedList);
+                              }}
+                              className="w-16 px-2 py-1 border rounded text-center"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-right font-medium">
+                            {a.prixTotal.toLocaleString()} {a.devise}
+                          </td>
                           <td className="px-4 py-2 text-center">
                             <button
-                              onClick={() => removeAnalyse(index)}
+                              onClick={() => {
+                                const filtered = selectedAnalyses.filter((_, i) => i !== index);
+                                setSelectedAnalyses(filtered);
+                              }}
                               className="text-red-600 hover:text-red-800"
+                              title="Supprimer"
                             >
                               <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
                             </button>
@@ -362,13 +380,13 @@ const FicheAnalyseForm = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="bg-gray-50">
+                    <tfoot className="bg-gray-100">
                       <tr>
-                        <td colSpan="5" className="px-4 py-3 text-right font-bold">
-                          TOTAL GÉNÉRAL
+                        <td colSpan="6" className="px-4 py-3 text-right font-bold text-lg">
+                          TOTAL GÉNÉRAL ({selectedAnalyses.length} analyse{selectedAnalyses.length > 1 ? 's' : ''})
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-primary-600">
-                          {calculerTotalGeneral()} {devise}
+                        <td className="px-4 py-3 text-right font-bold text-lg text-primary-600">
+                          {calculerTotalGeneral().toLocaleString()} {devise}
                         </td>
                         <td></td>
                       </tr>
@@ -377,7 +395,6 @@ const FicheAnalyseForm = () => {
                 </div>
               </div>
             )}
-
             {/* Devise et notes */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
