@@ -1,160 +1,136 @@
 // ===========================================
-// FICHIER: src/models/Devis.js
-// RÔLE: Modèle pour les devis et factures
-// VERSION: Corrigée avec champ devise
+// MODÈLE: Devis.js
+// RÔLE: Modèle pour les devis
+// VERSION: Corrigée (middleware pre('save') réparé)
 // ===========================================
 
 const mongoose = require('mongoose');
 
-// Liste des devises autorisées
-const CURRENCIES = ['EUR', 'USD', 'GNF', 'XOF', 'GBP', 'MAD', 'DZD', 'TND'];
-
 const devisSchema = new mongoose.Schema({
-  // Numéro unique du devis
   numero: {
     type: String,
     required: true,
     unique: true
   },
-
-  // Type de document
   type: {
     type: String,
     enum: ['proforma', 'devis', 'facture', 'avoir'],
     default: 'devis'
   },
-
-  // ===== DEVISES =====
-  // Devise sélectionnée par l'utilisateur (CORRECTION ICI)
-  devise: {
-    type: String,
-    enum: CURRENCIES,
-    default: 'EUR',
-    required: true
-  },
-
-  // Devise cible (pour compatibilité avec ancien code)
-  deviseCible: {
-    type: String,
-    enum: CURRENCIES,
-    default: 'EUR'
-  },
-
-  // ===== LIENS =====
   laboratoireId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Laboratoire',
     required: true
   },
-  
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Patient',
     required: true
   },
-  
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-
-  // ===== LIGNES DU DEVIS =====
+  devise: {
+    type: String,
+    default: 'EUR',
+    enum: ['EUR', 'USD', 'GNF', 'XOF', 'GBP', 'MAD', 'DZD', 'TND']
+  },
   lignes: [{
-    analyseId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'Analyse' 
-    },
-    quantite: { 
-      type: Number, 
-      default: 1,
-      min: 1
-    },
-    prixUnitaire: {
-      valeur: { type: Number, default: 0 },
-      devise: { type: String, enum: CURRENCIES, default: 'EUR' }
-    }
+    analyseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Analyse' },
+    code: String,
+    nom: String,
+    categorie: String,
+    prixUnitaire: Number,
+    devise: { type: String, default: 'EUR' },
+    quantite: { type: Number, default: 1, min: 1 },
+    prixTotal: Number,
+    observations: String
   }],
-
-  // ===== TOTAUX =====
   sousTotal: {
     valeur: { type: Number, default: 0 },
-    devise: { type: String, enum: CURRENCIES, default: 'EUR' }
+    devise: { type: String, default: 'EUR' }
   },
-
   total: {
     valeur: { type: Number, default: 0 },
-    devise: { type: String, enum: CURRENCIES, default: 'EUR' }
+    devise: { type: String, default: 'EUR' }
   },
-
-  // ===== REMISES =====
   remiseGlobale: {
     type: Number,
     default: 0,
     min: 0,
     max: 100
   },
-
-  // ===== DATES =====
   dateEmission: {
     type: Date,
     default: Date.now
   },
-
   dateValidite: {
     type: Date,
-    default: () => new Date(+new Date() + 30*24*60*60*1000) // +30 jours
+    default: () => new Date(+new Date() + 30*24*60*60*1000)
   },
-
-  datePaiement: {
-    type: Date
-  },
-
-  // ===== STATUT =====
+  datePaiement: Date,
   statut: {
     type: String,
     enum: ['brouillon', 'envoye', 'accepte', 'refuse', 'paye', 'annule', 'expire'],
     default: 'brouillon'
   },
-
-  // ===== NOTES =====
-  notes: {
-    type: String,
-    default: ''
-  },
-
-  // ===== HISTORIQUE =====
+  notes: String,
   historique: [{
     action: String,
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     date: { type: Date, default: Date.now },
     details: mongoose.Schema.Types.Mixed
   }],
+  actif: { type: Boolean, default: true }
+}, { timestamps: true });
 
-  // ===== MÉTA-DONNÉES =====
-  actif: {
-    type: Boolean,
-    default: true
+// ===== MIDDLEWARE PRE-SAVE CORRIGÉ =====
+devisSchema.pre('save', function(next) {
+  try {
+    // Vérifier qu'il y a des lignes
+    if (!this.lignes || this.lignes.length === 0) {
+      return next();
+    }
+
+    // Calculer le sous-total
+    let sousTotalCalc = 0;
+    this.lignes.forEach(ligne => {
+      // S'assurer que prixTotal est calculé
+      if (!ligne.prixTotal) {
+        ligne.prixTotal = (ligne.prixUnitaire || 0) * (ligne.quantite || 1);
+      }
+      sousTotalCalc += ligne.prixTotal;
+    });
+
+    // Appliquer la remise
+    const totalCalc = sousTotalCalc * (1 - (this.remiseGlobale || 0) / 100);
+
+    // Mettre à jour les champs
+    this.sousTotal = {
+      valeur: Number(sousTotalCalc.toFixed(2)),
+      devise: this.devise || 'EUR'
+    };
+    
+    this.total = {
+      valeur: Number(totalCalc.toFixed(2)),
+      devise: this.devise || 'EUR'
+    };
+
+    // Appeler next pour continuer
+    next();
+  } catch (error) {
+    // En cas d'erreur, passer l'erreur à next
+    next(error);
   }
-
-}, {
-  timestamps: true
 });
 
-// ===== INDEX POUR OPTIMISER LES RECHERCHES =====
+// Index pour optimiser les recherches
 devisSchema.index({ numero: 1 });
 devisSchema.index({ laboratoireId: 1 });
 devisSchema.index({ patientId: 1 });
 devisSchema.index({ statut: 1 });
 devisSchema.index({ dateEmission: -1 });
-
-// ===== MIDDLEWARE PRE-SAVE SIMPLE =====
-devisSchema.pre('save', function(next) {
-  // Si deviseCible n'est pas définie, utiliser devise
-  if (!this.deviseCible && this.devise) {
-    this.deviseCible = this.devise;
-  }
-  next();
-});
 
 module.exports = mongoose.model('Devis', devisSchema);
