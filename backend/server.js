@@ -43,6 +43,7 @@ const patientRoutes = require('./src/routes/patientRoutes');
 const analyseRoutes = require('./src/routes/analyseRoutes');
 const devisRoutes = require('./src/routes/devisRoutes');
 const statsRoutes = require('./src/routes/statsRoutes');
+const ficheAnalyseRoutes = require('./routes/ficheAnalyseRoutes');
 
 // 2. UTILISER les routes
 app.use('/api/users', userRoutes);
@@ -51,6 +52,9 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/analyses', analyseRoutes);
 app.use('/api/devis', devisRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/fiches-analyses', ficheAnalyseRoutes);
+
+
 
 // 6. ROUTE DE TEST (pour vérifier que le serveur fonctionne)
 app.get('/', (req, res) => {
