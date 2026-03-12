@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: AnalyseForm
 // RÔLE: Création/édition d'une analyse (catalogue)
-// VERSION: Finale professionnelle
+// VERSION: Finale avec normes médicales
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
@@ -51,10 +51,16 @@ const AnalyseForm = () => {
     prix: { valeur: 0, devise: 'EUR' },
     typeEchantillon: 'Sang',
     instructions: '',
-    normes: {
+    valeursReference: {
       homme: { min: '', max: '', texte: '' },
       femme: { min: '', max: '', texte: '' },
       enfant: { min: '', max: '', texte: '' }
+    },
+    normesMedicales: {
+      loinc: '',
+      snomed: '',
+      iso15189: '',
+      autres: ''
     },
     delaiRendu: 24,
     uniteMesure: ''
@@ -105,17 +111,28 @@ const AnalyseForm = () => {
         prix: { ...prev.prix, devise: value }
       }));
     }
-    // Gestion des normes
-    else if (name.startsWith('normes.')) {
+    // Gestion des valeurs de référence
+    else if (name.startsWith('valeursReference.')) {
       const [_, categorie, champ] = name.split('.');
       setFormData(prev => ({
         ...prev,
-        normes: {
-          ...prev.normes,
+        valeursReference: {
+          ...prev.valeursReference,
           [categorie]: {
-            ...prev.normes[categorie],
+            ...prev.valeursReference[categorie],
             [champ]: value
           }
+        }
+      }));
+    }
+    // Gestion des normes médicales
+    else if (name.startsWith('normesMedicales.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        normesMedicales: {
+          ...prev.normesMedicales,
+          [field]: value
         }
       }));
     }
@@ -123,6 +140,53 @@ const AnalyseForm = () => {
     else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  // ===== NETTOYAGE DES DONNÉES AVANT ENVOI =====
+  const nettoyerDonnees = () => {
+    // Nettoyer les valeurs de référence (enlever les champs vides)
+    const valeursReferenceNettoyees = {};
+    
+    ['homme', 'femme', 'enfant'].forEach(categorie => {
+      const vals = formData.valeursReference[categorie];
+      if (vals.min || vals.max || vals.texte) {
+        valeursReferenceNettoyees[categorie] = {
+          ...(vals.min && { min: Number(vals.min) }),
+          ...(vals.max && { max: Number(vals.max) }),
+          ...(vals.texte && { texte: vals.texte.trim() })
+        };
+      }
+    });
+
+    // Nettoyer les normes médicales (garder seulement les non vides)
+    const normesMedicalesNettoyees = {};
+    Object.entries(formData.normesMedicales).forEach(([key, value]) => {
+      if (value.trim()) {
+        normesMedicalesNettoyees[key] = value.trim();
+      }
+    });
+
+    return {
+      code: formData.code.toUpperCase().trim(),
+      nom: {
+        fr: formData.nom.fr.trim(),
+        en: formData.nom.en?.trim() || '',
+        es: formData.nom.es?.trim() || ''
+      },
+      categorie: formData.categorie,
+      prix: {
+        valeur: Number(formData.prix.valeur),
+        devise: formData.prix.devise
+      },
+      typeEchantillon: formData.typeEchantillon,
+      instructions: formData.instructions?.trim() || '',
+      valeursReference: valeursReferenceNettoyees,
+      normesMedicales: normesMedicalesNettoyees,
+      delaiRendu: Number(formData.delaiRendu) || 24,
+      uniteMesure: formData.uniteMesure?.trim() || '-',
+      laboratoireId: user?.laboratoireId,
+      createdBy: user?._id
+    };
   };
 
   // ===== SOUMISSION =====
@@ -138,28 +202,8 @@ const AnalyseForm = () => {
         return;
       }
 
-      const dataToSend = {
-        code: formData.code.toUpperCase().trim(),
-        nom: {
-          fr: formData.nom.fr.trim(),
-          en: formData.nom.en?.trim() || '',
-          es: formData.nom.es?.trim() || ''
-        },
-        categorie: formData.categorie,
-        prix: {
-          valeur: Number(formData.prix.valeur),
-          devise: formData.prix.devise
-        },
-        typeEchantillon: formData.typeEchantillon,
-        instructions: formData.instructions?.trim() || '',
-        normes: formData.normes,
-        delaiRendu: Number(formData.delaiRendu) || 24,
-        uniteMesure: formData.uniteMesure?.trim() || '-',
-        laboratoireId: user?.laboratoireId,
-        createdBy: user?._id
-      };
-
-      console.log('📤 Envoi:', JSON.stringify(dataToSend, null, 2));
+      const dataToSend = nettoyerDonnees();
+      console.log('📤 Envoi (nettoyé):', JSON.stringify(dataToSend, null, 2));
 
       if (id) {
         await api.put(`/analyses/${id}`, dataToSend);
@@ -258,25 +302,25 @@ const AnalyseForm = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Nom (EN)</label>
+                  <label className="block text-sm font-medium mb-2">Nom (EN) - optionnel</label>
                   <input
                     type="text"
                     name="nom.en"
                     value={formData.nom.en}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border rounded-lg"
-                    placeholder="Optionnel"
+                    placeholder="Pour export international"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Nom (ES)</label>
+                  <label className="block text-sm font-medium mb-2">Nom (ES) - optionnel</label>
                   <input
                     type="text"
                     name="nom.es"
                     value={formData.nom.es}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border rounded-lg"
-                    placeholder="Optionnel"
+                    placeholder="Pour export international"
                   />
                 </div>
               </div>
@@ -360,9 +404,9 @@ const AnalyseForm = () => {
               </div>
             </div>
 
-            {/* SECTION 4 : NORMES (OPTIONNEL) */}
+            {/* SECTION 4 : VALEURS DE RÉFÉRENCE */}
             <div className="border-b pb-4">
-              <h2 className="text-lg font-semibold mb-4 text-primary-600">Normes (optionnel)</h2>
+              <h2 className="text-lg font-semibold mb-4 text-primary-600">Valeurs de référence (optionnel)</h2>
               
               <div className="space-y-4">
                 {/* Homme */}
@@ -371,26 +415,26 @@ const AnalyseForm = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <input
                       type="text"
-                      name="normes.homme.min"
-                      value={formData.normes.homme.min}
+                      name="valeursReference.homme.min"
+                      value={formData.valeursReference.homme.min}
                       onChange={handleChange}
                       placeholder="Min"
                       className="px-3 py-2 border rounded"
                     />
                     <input
                       type="text"
-                      name="normes.homme.max"
-                      value={formData.normes.homme.max}
+                      name="valeursReference.homme.max"
+                      value={formData.valeursReference.homme.max}
                       onChange={handleChange}
                       placeholder="Max"
                       className="px-3 py-2 border rounded"
                     />
                     <input
                       type="text"
-                      name="normes.homme.texte"
-                      value={formData.normes.homme.texte}
+                      name="valeursReference.homme.texte"
+                      value={formData.valeursReference.homme.texte}
                       onChange={handleChange}
-                      placeholder="Texte"
+                      placeholder="Texte libre"
                       className="px-3 py-2 border rounded"
                     />
                   </div>
@@ -402,26 +446,26 @@ const AnalyseForm = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <input
                       type="text"
-                      name="normes.femme.min"
-                      value={formData.normes.femme.min}
+                      name="valeursReference.femme.min"
+                      value={formData.valeursReference.femme.min}
                       onChange={handleChange}
                       placeholder="Min"
                       className="px-3 py-2 border rounded"
                     />
                     <input
                       type="text"
-                      name="normes.femme.max"
-                      value={formData.normes.femme.max}
+                      name="valeursReference.femme.max"
+                      value={formData.valeursReference.femme.max}
                       onChange={handleChange}
                       placeholder="Max"
                       className="px-3 py-2 border rounded"
                     />
                     <input
                       type="text"
-                      name="normes.femme.texte"
-                      value={formData.normes.femme.texte}
+                      name="valeursReference.femme.texte"
+                      value={formData.valeursReference.femme.texte}
                       onChange={handleChange}
-                      placeholder="Texte"
+                      placeholder="Texte libre"
                       className="px-3 py-2 border rounded"
                     />
                   </div>
@@ -433,26 +477,26 @@ const AnalyseForm = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <input
                       type="text"
-                      name="normes.enfant.min"
-                      value={formData.normes.enfant.min}
+                      name="valeursReference.enfant.min"
+                      value={formData.valeursReference.enfant.min}
                       onChange={handleChange}
                       placeholder="Min"
                       className="px-3 py-2 border rounded"
                     />
                     <input
                       type="text"
-                      name="normes.enfant.max"
-                      value={formData.normes.enfant.max}
+                      name="valeursReference.enfant.max"
+                      value={formData.valeursReference.enfant.max}
                       onChange={handleChange}
                       placeholder="Max"
                       className="px-3 py-2 border rounded"
                     />
                     <input
                       type="text"
-                      name="normes.enfant.texte"
-                      value={formData.normes.enfant.texte}
+                      name="valeursReference.enfant.texte"
+                      value={formData.valeursReference.enfant.texte}
                       onChange={handleChange}
-                      placeholder="Texte"
+                      placeholder="Texte libre"
                       className="px-3 py-2 border rounded"
                     />
                   </div>
@@ -460,7 +504,72 @@ const AnalyseForm = () => {
               </div>
             </div>
 
-            {/* SECTION 5 : INFORMATIONS COMPLÉMENTAIRES */}
+            {/* SECTION 5 : NORMES MÉDICALES */}
+            <div className="border-b pb-4">
+              <h2 className="text-lg font-semibold mb-4 text-primary-600">Normes médicales (optionnel)</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Code LOINC
+                    <span className="text-xs text-gray-500 ml-2">Identifiant universel</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="normesMedicales.loinc"
+                    value={formData.normesMedicales.loinc}
+                    onChange={handleChange}
+                    placeholder="Ex: 2345-7"
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Code SNOMED CT
+                    <span className="text-xs text-gray-500 ml-2">Terminologie clinique</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="normesMedicales.snomed"
+                    value={formData.normesMedicales.snomed}
+                    onChange={handleChange}
+                    placeholder="Ex: 250560003"
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Certification ISO 15189
+                  </label>
+                  <input
+                    type="text"
+                    name="normesMedicales.iso15189"
+                    value={formData.normesMedicales.iso15189}
+                    onChange={handleChange}
+                    placeholder="Ex: LAB-12345"
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Autres normes
+                  </label>
+                  <input
+                    type="text"
+                    name="normesMedicales.autres"
+                    value={formData.normesMedicales.autres}
+                    onChange={handleChange}
+                    placeholder="CISMeF, HPO, etc."
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 6 : INFORMATIONS COMPLÉMENTAIRES */}
             <div>
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Informations complémentaires</h2>
               

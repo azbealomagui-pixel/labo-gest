@@ -29,10 +29,16 @@ const analyseSchema = new mongoose.Schema({
     enum: ['Sang', 'Urine', 'Selles', 'LCR', 'Prélèvement', 'Autre']
   },
   instructions: { type: String, default: '' },
-  normes: {
+  valeursReference: {
     homme: { min: Number, max: Number, texte: String },
     femme: { min: Number, max: Number, texte: String },
     enfant: { min: Number, max: Number, texte: String }
+  },
+  normesMedicales: {
+    loinc: { type: String, default: '' },
+    snomed: { type: String, default: '' },
+    iso15189: { type: String, default: '' },
+    autres: { type: String, default: '' }
   },
   delaiRendu: { type: Number, default: 24 },
   uniteMesure: { type: String, default: '-' },

@@ -18,8 +18,20 @@ const Analyses = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchAnalyses();
-  }, []);
+  const fetchAnalyses = async () => {
+    try {
+      const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
+      setAnalyses(response.data.analyses || []);
+    } catch (err) {
+      console.error('Erreur chargement:', err);
+      toast.error('Erreur chargement catalogue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchAnalyses();
+    }, [user.laboratoireId]); // Dépendance correcte
 
   const fetchAnalyses = async () => {
     try {
