@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: Devis
 // RÔLE: Liste et gestion des devis/factures
-// AVEC: Boutons de changement de statut
+// AVEC: Gestion complète des statuts et icônes
 // ===========================================
 
 import { useEffect, useState } from 'react';
@@ -9,7 +9,18 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
-import { IconAdd, IconEdit, IconDelete, IconSearch, IconPrinter } from '../assets';
+import { 
+  IconAdd, 
+  IconEdit, 
+  IconDelete, 
+  IconSearch, 
+  IconPrinter,
+  IconSend,
+  IconCheck,
+  IconX,
+  IconCreditCard,
+  IconBan
+} from '../assets';
 import { genererPDFDevis, ouvrirPDF, telechargerPDF } from '../utils/pdfGenerator';
 import { formatDate } from '../utils/formatters';
 
@@ -87,7 +98,7 @@ const Devis = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('tous');
   const [laboratoire, setLaboratoire] = useState(null);
-  const [actionLoading, setActionLoading] = useState(null); // Pour le loading des actions
+  const [actionLoading, setActionLoading] = useState(null);
 
   // ===== CHARGEMENT DES DEVIS =====
   useEffect(() => {
@@ -122,7 +133,7 @@ const Devis = () => {
     }
   }, [user?.laboratoireId]);
 
-  // ===== FONCTION DE CHANGEMENT DE STATUT =====
+  // ===== CHANGEMENT DE STATUT =====
   const updateStatut = async (id, nouveauStatut) => {
     setActionLoading(id);
     try {
@@ -132,12 +143,10 @@ const Devis = () => {
       });
       
       if (response.data.success) {
-        // Mettre à jour la liste localement
         setDevis(devis.map(d => 
           d._id === id ? { ...d, statut: nouveauStatut } : d
         ));
         
-        // Message de succès avec emoji selon le statut
         const messages = {
           envoye: '📤 Devis envoyé au patient',
           accepte: '✅ Devis accepté',
@@ -169,8 +178,8 @@ const Devis = () => {
   };
 
   // ===== BOUTONS D'ACTION SELON STATUT =====
-  const StatusActions = ({ devis }) => {
-    const config = STATUS_CONFIG[devis.statut] || STATUS_CONFIG.brouillon;
+  const StatusActions = ({ devisItem }) => {
+    const config = STATUS_CONFIG[devisItem.statut] || STATUS_CONFIG.brouillon;
     
     if (config.actions.length === 0) return null;
 
@@ -178,45 +187,45 @@ const Devis = () => {
       <div className="flex gap-1 ml-2">
         {config.actions.includes('envoyer') && (
           <button
-            onClick={() => updateStatut(devis._id, 'envoye')}
-            disabled={actionLoading === devis._id}
-            className="p-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+            onClick={() => updateStatut(devisItem._id, 'envoye')}
+            disabled={actionLoading === devisItem._id}
+            className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 transition-colors"
             title="Envoyer au patient"
           >
-            📤
+            <img src={IconSend} alt="Envoyer" className="w-4 h-4" />
           </button>
         )}
         
         {config.actions.includes('accepter') && (
           <button
-            onClick={() => updateStatut(devis._id, 'accepte')}
-            disabled={actionLoading === devis._id}
-            className="p-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50"
+            onClick={() => updateStatut(devisItem._id, 'accepte')}
+            disabled={actionLoading === devisItem._id}
+            className="p-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 transition-colors"
             title="Accepter le devis"
           >
-            ✅
+            <img src={IconCheck} alt="Accepter" className="w-4 h-4" />
           </button>
         )}
         
         {config.actions.includes('refuser') && (
           <button
-            onClick={() => updateStatut(devis._id, 'refuse')}
-            disabled={actionLoading === devis._id}
-            className="p-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50"
+            onClick={() => updateStatut(devisItem._id, 'refuse')}
+            disabled={actionLoading === devisItem._id}
+            className="p-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50 transition-colors"
             title="Refuser le devis"
           >
-            ❌
+            <img src={IconX} alt="Refuser" className="w-4 h-4" />
           </button>
         )}
         
         {config.actions.includes('payer') && (
           <button
-            onClick={() => updateStatut(devis._id, 'paye')}
-            disabled={actionLoading === devis._id}
-            className="p-1 text-xs bg-teal-100 text-teal-700 rounded hover:bg-teal-200 disabled:opacity-50"
+            onClick={() => updateStatut(devisItem._id, 'paye')}
+            disabled={actionLoading === devisItem._id}
+            className="p-1 bg-teal-100 text-teal-700 rounded hover:bg-teal-200 disabled:opacity-50 transition-colors"
             title="Marquer comme payé"
           >
-            💰
+            <img src={IconCreditCard} alt="Payer" className="w-4 h-4" />
           </button>
         )}
         
@@ -224,14 +233,14 @@ const Devis = () => {
           <button
             onClick={() => {
               if (window.confirm('Voulez-vous vraiment annuler ce devis ?')) {
-                updateStatut(devis._id, 'annule');
+                updateStatut(devisItem._id, 'annule');
               }
             }}
-            disabled={actionLoading === devis._id}
-            className="p-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+            disabled={actionLoading === devisItem._id}
+            className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 transition-colors"
             title="Annuler le devis"
           >
-            🚫
+            <img src={IconBan} alt="Annuler" className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -254,7 +263,7 @@ const Devis = () => {
         <div className="mb-4">
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             ← Retour tableau de bord
           </button>
@@ -270,7 +279,7 @@ const Devis = () => {
           </div>
           <button
             onClick={() => navigate('/devis/new')}
-            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
           >
             <img src={IconAdd} alt="" className="w-5 h-5" />
             Nouveau devis
@@ -283,7 +292,7 @@ const Devis = () => {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
             >
               <option value="tous">Tous les statuts</option>
               {Object.entries(STATUS_CONFIG).map(([key, config]) => (
@@ -336,7 +345,7 @@ const Devis = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <StatusBadge statut={d.statut} />
-                      <StatusActions devis={d} />
+                      <StatusActions devisItem={d} />
                     </div>
                   </td>
                   <td className="px-6 py-4">

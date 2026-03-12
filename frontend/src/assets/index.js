@@ -30,6 +30,20 @@ import IconPrinter from './icons/actions/icon-printer.svg';
 // Icônes Actions de toggle password visibility
 import IconEye from './icons/actions/icon-eye.svg'; 
 import IconEyeSlash from './icons/actions/icon-eye-slash.svg';
+// ===== ICÔNES ACTIONS =====
+import IconSend from './icons/actions/icon-send.svg';
+import IconCheck from './icons/actions/icon-check.svg';
+import IconX from './icons/actions/icon-x.svg';
+import IconCreditCard from './icons/actions/icon-credit-card.svg';
+import IconBan from './icons/actions/icon-ban.svg';
+
+
+
+
+
+
+
+
 
 export {
   LogoLab,
@@ -50,5 +64,9 @@ export {
   IconPrinter,
   IconEye,
   IconEyeSlash,
-
+  IconSend,
+  IconCheck,
+  IconX,
+  IconCreditCard,
+  IconBan,
 };
