@@ -17,7 +17,7 @@ Application professionnelle de gestion de laboratoire médical.
 - **Frontend** : React, Tailwind CSS, Vite
 - **Sécurité** : JWT, Bcrypt
 
-## Installation
+## Installation de:
 
 ```bash
 # Backend
