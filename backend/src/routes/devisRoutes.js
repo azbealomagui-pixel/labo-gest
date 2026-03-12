@@ -161,4 +161,81 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ===========================================
+// CHANGER LE STATUT D'UN DEVIS (PATCH)
+// ===========================================
+router.patch('/:id/statut', async (req, res) => {
+  try {
+    const { statut, userId } = req.body;
+    const { id } = req.params;
+
+    // Validation du statut
+    const statutsValides = ['brouillon', 'envoye', 'accepte', 'refuse', 'paye', 'annule'];
+    if (!statutsValides.includes(statut)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Statut invalide'
+      });
+    }
+
+    const devis = await Devis.findById(id);
+    if (!devis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Devis non trouvé'
+      });
+    }
+
+    // Logique métier : empêcher certains changements
+    if (devis.statut === 'paye' && statut !== 'paye') {
+      return res.status(400).json({
+        success: false,
+        message: 'Un devis payé ne peut pas changer de statut'
+      });
+    }
+
+    if (devis.statut === 'annule') {
+      return res.status(400).json({
+        success: false,
+        message: 'Un devis annulé ne peut pas être modifié'
+      });
+    }
+
+    // Mettre à jour le statut
+    devis.statut = statut;
+    
+    // Si le statut devient "payé", enregistrer la date
+    if (statut === 'paye') {
+      devis.datePaiement = new Date();
+    }
+
+    // Ajouter à l'historique
+    if (typeof devis.ajouterHistorique === 'function') {
+      devis.ajouterHistorique(
+        `CHANGEMENT_STATUT`,
+        userId,
+        { ancien: devis.statut, nouveau: statut }
+      );
+    }
+
+    await devis.save();
+
+    res.json({
+      success: true,
+      message: `Statut mis à jour : ${statut}`,
+      devis
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur changement statut:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur'
+    });
+  }
+});
+
+
+
+
 module.exports = router;
