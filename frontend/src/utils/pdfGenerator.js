@@ -8,6 +8,35 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
 
+// ===== FONCTIONS D'EXPORT =====
+
+/**
+ * Ouvre le PDF dans un nouvel onglet
+ */
+export const ouvrirPDF = (doc) => {
+  try {
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+  } catch (error) {
+    console.error('Erreur ouverture PDF:', error);
+    alert('Impossible d\'ouvrir le PDF');
+  }
+};
+
+/**
+ * Télécharge le PDF
+ */
+export const telechargerPDF = (doc, nomFichier = 'document.pdf') => {
+  try {
+    doc.save(nomFichier);
+  } catch (error) {
+    console.error('Erreur téléchargement PDF:', error);
+    alert('Impossible de télécharger le PDF');
+  }
+};
+
 /**
  * Génère un code QR et l'ajoute au PDF
  */
