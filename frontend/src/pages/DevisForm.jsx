@@ -1,11 +1,10 @@
 // ===========================================
 // PAGE: DevisForm
-// RÔLE: Création d'un devis (patient + analyses)
-// VERSION: Sans variable inutilisée
+// RÔLE: Création/Modification d'un devis
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom'; // ← AJOUTER useParams
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
@@ -24,6 +23,7 @@ const CURRENCIES = [
 
 const DevisForm = () => {
   const navigate = useNavigate();
+  const { id } = useParams(); // ← RÉCUPÉRER L'ID
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [patients, setPatients] = useState([]);
@@ -35,6 +35,46 @@ const DevisForm = () => {
   const [remise, setRemise] = useState(0);
   const [selectedDevise, setSelectedDevise] = useState('EUR');
   const [errors, setErrors] = useState({});
+
+  // ===== CHARGEMENT DU DEVIS EN MODE ÉDITION =====
+  useEffect(() => {
+    if (id) {
+      const loadDevis = async () => {
+        try {
+          setLoading(true);
+          const response = await api.get(`/devis/${id}`);
+          const devis = response.data.devis;
+          
+          // Charger le patient
+          setSelectedPatient(devis.patientId);
+          
+          // Charger les analyses
+          const analysesChargees = devis.lignes.map(ligne => ({
+            _id: ligne.analyseId?._id || ligne.analyseId,
+            code: ligne.code,
+            nom: ligne.nom,
+            categorie: ligne.categorie,
+            prix: { valeur: ligne.prixUnitaire },
+            quantite: ligne.quantite
+          }));
+          setSelectedAnalyses(analysesChargees);
+          
+          // Charger les autres données
+          setRemise(devis.remiseGlobale || 0);
+          setSelectedDevise(devis.devise || 'EUR');
+          
+          toast.success('Devis chargé avec succès');
+        } catch (err) {
+          console.error('❌ Erreur chargement devis:', err);
+          toast.error('Impossible de charger le devis');
+          navigate('/devis');
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadDevis();
+    }
+  }, [id, navigate]);
 
   // Charger les patients
   useEffect(() => {
@@ -67,19 +107,9 @@ const DevisForm = () => {
   // ===== VALIDATION =====
   const validateForm = () => {
     const newErrors = {};
-
-    if (!selectedPatient) {
-      newErrors.patient = 'Veuillez sélectionner un patient';
-    }
-
-    if (selectedAnalyses.length === 0) {
-      newErrors.analyses = 'Veuillez ajouter au moins une analyse';
-    }
-
-    if (remise < 0 || remise > 100) {
-      newErrors.remise = 'La remise doit être entre 0 et 100%';
-    }
-
+    if (!selectedPatient) newErrors.patient = 'Veuillez sélectionner un patient';
+    if (selectedAnalyses.length === 0) newErrors.analyses = 'Veuillez ajouter au moins une analyse';
+    if (remise < 0 || remise > 100) newErrors.remise = 'La remise doit être entre 0 et 100%';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -87,19 +117,15 @@ const DevisForm = () => {
   // ===== AJOUTER UNE ANALYSE =====
   const addAnalyse = (analyse) => {
     const exists = selectedAnalyses.find(a => a._id === analyse._id);
-    
     if (exists) {
       setSelectedAnalyses(selectedAnalyses.map(a =>
         a._id === analyse._id ? { ...a, quantite: a.quantite + 1 } : a
       ));
-      toast.info(`Quantité augmentée pour ${analyse.code}`);
     } else {
       setSelectedAnalyses([...selectedAnalyses, { 
         ...analyse, 
-        quantite: 1,
-        devise: analyse.prix?.devise || 'EUR'
+        quantite: 1
       }]);
-      toast.success(`${analyse.code} ajouté au devis`);
     }
   };
 
@@ -127,12 +153,6 @@ const DevisForm = () => {
     return total.toFixed(2);
   };
 
-  // ===== LIBELLÉ DEVISE =====
-  const getDeviseLabel = (code) => {
-    const devise = CURRENCIES.find(c => c.code === code);
-    return devise ? `${devise.nom} (${devise.symbole})` : code;
-  };
-
   // ===== SOUMISSION =====
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -156,22 +176,24 @@ const DevisForm = () => {
           nom: a.nom?.fr || a.nom,
           categorie: a.categorie,
           quantite: a.quantite,
-          prixUnitaire: a.prix?.valeur || 0,
-          devise: a.prix?.devise || 'EUR'
+          prixUnitaire: a.prix?.valeur || 0
         })),
         remiseGlobale: remise,
-        notes: `Devis créé par ${user.prenom} ${user.nom}`
+        notes: `Devis ${id ? 'modifié' : 'créé'} par ${user.prenom} ${user.nom}`
       };
 
-      const response = await api.post('/devis', devisData);
-      
-      if (response.data.success) {
+      if (id) {
+        await api.put(`/devis/${id}`, devisData);
+        toast.success('✅ Devis modifié avec succès');
+      } else {
+        await api.post('/devis', devisData);
         toast.success('✅ Devis créé avec succès');
-        navigate('/devis');
       }
+      
+      navigate('/devis');
     } catch (err) {
-      console.error('❌ Erreur création devis:', err);
-      toast.error(err.response?.data?.message || 'Erreur création devis');
+      console.error('❌ Erreur:', err);
+      toast.error(err.response?.data?.message || 'Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);
     }
@@ -187,6 +209,14 @@ const DevisForm = () => {
     a.code.toLowerCase().includes(searchAnalyse.toLowerCase()) ||
     a.nom?.fr?.toLowerCase().includes(searchAnalyse.toLowerCase())
   );
+
+  if (loading && id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-600 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -204,7 +234,9 @@ const DevisForm = () => {
             </button>
           </div>
 
-          <h1 className="text-2xl font-bold mb-6">Nouveau devis</h1>
+          <h1 className="text-2xl font-bold mb-6">
+            {id ? 'Modifier le devis' : 'Nouveau devis'}
+          </h1>
 
           {/* Messages d'erreur */}
           {Object.keys(errors).length > 0 && (
@@ -224,7 +256,7 @@ const DevisForm = () => {
             
             {/* Colonne patient */}
             <div>
-              <h2 className="text-lg font-semibold mb-4">1. Sélectionner un patient</h2>
+              <h2 className="text-lg font-semibold mb-4">1. Patient</h2>
               
               <div className="relative mb-4">
                 <input
@@ -254,14 +286,14 @@ const DevisForm = () => {
 
               {selectedPatient && (
                 <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                  Patient sélectionné : {selectedPatient.nom} {selectedPatient.prenom}
+                  Patient : {selectedPatient.nom} {selectedPatient.prenom}
                 </div>
               )}
             </div>
 
             {/* Colonne analyses */}
             <div>
-              <h2 className="text-lg font-semibold mb-4">2. Ajouter des analyses</h2>
+              <h2 className="text-lg font-semibold mb-4">2. Analyses</h2>
               
               <div className="relative mb-4">
                 <input
@@ -349,7 +381,7 @@ const DevisForm = () => {
               className="w-full md:w-64 px-4 py-2 border rounded-lg"
             >
               {CURRENCIES.map(d => (
-                <option key={d.code} value={d.code}>{getDeviseLabel(d.code)}</option>
+                <option key={d.code} value={d.code}>{d.nom} ({d.symbole})</option>
               ))}
             </select>
           </div>
@@ -361,7 +393,7 @@ const DevisForm = () => {
               disabled={loading}
               className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50"
             >
-              {loading ? 'Création...' : 'Créer le devis'}
+              {loading ? 'Enregistrement...' : (id ? 'Modifier' : 'Créer')}
             </button>
             <button
               onClick={() => navigate('/devis')}
