@@ -184,6 +184,102 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// ===========================================
+// METTRE À JOUR UN DEVIS (PUT)
+// ===========================================
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { patientId, lignes, remiseGlobale, notes, devise } = req.body;
+
+    // Vérifier que le devis existe
+    const devis = await Devis.findById(id);
+    if (!devis) {
+      return res.status(404).json({
+        success: false,
+        message: 'Devis non trouvé'
+      });
+    }
+
+    // Empêcher la modification si le devis est payé ou annulé
+    if (devis.statut === 'paye' || devis.statut === 'annule') {
+      return res.status(400).json({
+        success: false,
+        message: 'Un devis payé ou annulé ne peut pas être modifié'
+      });
+    }
+
+    // Recalculer les totaux
+    let sousTotal = 0;
+    const lignesTraitees = [];
+
+    for (const ligne of lignes) {
+      const analyse = await Analyse.findById(ligne.analyseId);
+      if (!analyse) {
+        return res.status(404).json({
+          success: false,
+          message: `Analyse avec ID ${ligne.analyseId} non trouvée`
+        });
+      }
+
+      const prixUnitaire = ligne.prixUnitaire || analyse.prix?.valeur || 0;
+      const quantite = ligne.quantite || 1;
+      const prixTotal = prixUnitaire * quantite;
+      
+      sousTotal += prixTotal;
+
+      lignesTraitees.push({
+        analyseId: analyse._id,
+        code: analyse.code,
+        nom: analyse.nom?.fr || analyse.nom,
+        categorie: analyse.categorie,
+        prixUnitaire,
+        devise: ligne.devise || analyse.prix?.devise || 'EUR',
+        quantite,
+        prixTotal,
+        observations: ligne.observations || ''
+      });
+    }
+
+    const remise = remiseGlobale || 0;
+    const total = sousTotal * (1 - remise / 100);
+
+    // Mettre à jour le devis
+    devis.patientId = patientId || devis.patientId;
+    devis.lignes = lignesTraitees;
+    devis.remiseGlobale = remise;
+    devis.notes = notes || devis.notes;
+    devis.devise = devise || devis.devise;
+    devis.sousTotal = { valeur: Number(sousTotal.toFixed(2)), devise: devis.devise };
+    devis.total = { valeur: Number(total.toFixed(2)), devise: devis.devise };
+
+    // Ajouter à l'historique
+    if (typeof devis.ajouterHistorique === 'function') {
+      devis.ajouterHistorique('MODIFICATION', req.body.userId, {
+        date: new Date(),
+        modifications: req.body
+      });
+    }
+
+    await devis.save();
+
+    res.json({
+      success: true,
+      message: 'Devis mis à jour avec succès',
+      devis
+    });
+
+  } catch (error) {
+    console.error('❌ Erreur mise à jour devis:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erreur serveur'
+    });
+  }
+});
+
+
 // ===== SUPPRESSION LOGIQUE D'UN DEVIS =====
 router.delete('/:id', async (req, res) => {
   try {
