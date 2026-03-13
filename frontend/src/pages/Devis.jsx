@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: Devis
 // RÔLE: Liste et gestion des devis/factures
-// AVEC: Recherche instantanée + confirmation actions
+// AVEC: Bouton Supprimer individuel + Excel global
 // ===========================================
 
 import { useEffect, useState } from 'react';
@@ -165,9 +165,79 @@ const Devis = () => {
     return () => clearTimeout(timer);
   }, [searchTerm, filter, devis]);
 
-  // ===== CHANGEMENT DE STATUT AVEC CONFIRMATION =====
+  // ===== SUPPRESSION D'UN DEVIS =====
+  const handleDelete = async (id, numero) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer le devis ${numero} ?`)) {
+      return;
+    }
+
+    setActionLoading(id);
+    try {
+      await api.delete(`/devis/${id}`);
+      toast.success(`✅ Devis ${numero} supprimé`);
+      
+      // Mettre à jour les listes
+      const updatedDevis = devis.filter(d => d._id !== id);
+      setDevis(updatedDevis);
+      
+      // Re-filtrer après suppression
+      let filtered = updatedDevis;
+      if (filter !== 'tous') {
+        filtered = filtered.filter(d => d.statut === filter);
+      }
+      if (searchTerm.length >= 2) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(d => 
+          d.numero.toLowerCase().includes(term) ||
+          `${d.patientId?.nom} ${d.patientId?.prenom}`.toLowerCase().includes(term)
+        );
+      }
+      setFilteredDevis(filtered);
+      
+    } catch (err) {
+      console.error('❌ Erreur suppression:', err);
+      toast.error(err.response?.data?.message || 'Erreur lors de la suppression');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ===== EXPORT EXCEL GLOBAL =====
+  const exportAllToExcel = () => {
+    try {
+      const devisAExporter = filteredDevis.map(d => ({
+        numero: d.numero,
+        patient: `${d.patientId?.nom || ''} ${d.patientId?.prenom || ''}`.trim(),
+        date: formatDate(d.dateEmission),
+        montant: d.total?.valeur || 0,
+        devise: d.devise || 'EUR',
+        statut: d.statut,
+        remise: d.remiseGlobale || 0,
+        dateEmission: new Date(d.dateEmission).toLocaleDateString('fr-FR'),
+        dateValidite: d.dateValidite ? new Date(d.dateValidite).toLocaleDateString('fr-FR') : ''
+      }));
+
+      exportToExcel(devisAExporter, `devis-${new Date().toISOString().split('T')[0]}`, {
+        numero: 'N° Devis',
+        patient: 'Patient',
+        date: 'Date',
+        montant: 'Montant',
+        devise: 'Devise',
+        statut: 'Statut',
+        remise: 'Remise %',
+        dateEmission: 'Date émission',
+        dateValidite: 'Date validité'
+      });
+      
+      toast.success(`✅ ${devisAExporter.length} devis exportés`);
+    } catch (err) {
+      console.error('❌ Erreur export Excel:', err);
+      toast.error('Erreur lors de l\'export Excel');
+    }
+  };
+
+  // ===== CHANGEMENT DE STATUT =====
   const updateStatut = async (id, nouveauStatut, action) => {
-    // Messages de confirmation personnalisés
     const confirmMessages = {
       envoyer: 'Voulez-vous envoyer ce devis au patient ?',
       accepter: 'Voulez-vous accepter ce devis ?',
@@ -177,7 +247,7 @@ const Devis = () => {
     };
 
     if (!window.confirm(confirmMessages[action])) {
-      return; // Annulation de l'action
+      return;
     }
 
     setActionLoading(id);
@@ -188,13 +258,11 @@ const Devis = () => {
       });
       
       if (response.data.success) {
-        // Mettre à jour les deux listes
         const updatedDevis = devis.map(d => 
           d._id === id ? { ...d, statut: nouveauStatut } : d
         );
         setDevis(updatedDevis);
         
-        // Re-filtrer après mise à jour
         let filtered = updatedDevis;
         if (filter !== 'tous') {
           filtered = filtered.filter(d => d.statut === filter);
@@ -209,17 +277,17 @@ const Devis = () => {
         setFilteredDevis(filtered);
         
         const messages = {
-          envoye: '📤 Devis envoyé au patient',
+          envoye: '📤 Devis envoyé',
           accepte: '✅ Devis accepté',
           refuse: '❌ Devis refusé',
-          paye: '💰 Devis marqué comme payé',
+          paye: '💰 Devis payé',
           annule: '🚫 Devis annulé'
         };
-        toast.success(messages[nouveauStatut] || `Statut changé en ${nouveauStatut}`);
+        toast.success(messages[nouveauStatut]);
       }
     } catch (err) {
-      console.error('❌ Erreur changement statut:', err);
-      toast.error(err.response?.data?.message || 'Erreur lors du changement de statut');
+      console.error('❌ Erreur:', err);
+      toast.error(err.response?.data?.message || 'Erreur');
     } finally {
       setActionLoading(null);
     }
@@ -326,7 +394,7 @@ const Devis = () => {
           </button>
         </div>
 
-        {/* En-tête */}
+        {/* En-tête avec bouton Excel global */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Devis & Factures</h1>
@@ -334,19 +402,32 @@ const Devis = () => {
               {filteredDevis.length} devis affiché(s) sur {devis.length}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/devis/new')}
-            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <img src={IconAdd} alt="" className="w-5 h-5" />
-            Nouveau devis
-          </button>
+          <div className="flex gap-4">
+            {/* ===== BOUTON EXCEL GLOBAL ===== */}
+            <button
+              onClick={exportAllToExcel}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              title="Exporter tous les devis en Excel"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Excel
+            </button>
+            
+            <button
+              onClick={() => navigate('/devis/new')}
+              className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <img src={IconAdd} alt="" className="w-5 h-5" />
+              Nouveau devis
+            </button>
+          </div>
         </div>
 
         {/* Filtres et recherche */}
         <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
-            {/* Filtre par statut */}
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -358,7 +439,6 @@ const Devis = () => {
               ))}
             </select>
 
-            {/* Barre de recherche instantanée */}
             <div className="flex-1 relative">
               <input
                 type="text"
@@ -467,37 +547,22 @@ const Devis = () => {
                             const doc = await genererPDFDevis(d, laboratoire, user);
                             if (doc) telechargerPDF(doc, `devis-${d.numero}.pdf`);
                           }}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Télécharger le PDF">
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Télécharger le PDF"
+                        >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
                         </button>
 
-                        {/* ===== BOUTON EXCEL ===== */}
+                        {/* ===== BOUTON SUPPRIMER (remplace Excel individuel) ===== */}
                         <button
-                          onClick={() => {
-                            try {
-                              exportToExcel([d], `devis-${d.numero}`, {
-                                numero: 'N° Devis',
-                                'patientId.nom': 'Patient Nom',
-                                'patientId.prenom': 'Patient Prénom',
-                                dateEmission: 'Date',
-                                'total.valeur': 'Montant',
-                                devise: 'Devise',
-                                statut: 'Statut'
-                              });
-                              toast.success('✅ Excel généré');
-                            } catch (err) {
-                              console.error('❌ Erreur Excel:', err);
-                              toast.error('Erreur génération Excel');
-                            }
-                          }}
-                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Télécharger Excel">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
+                          onClick={() => handleDelete(d._id, d.numero)}
+                          disabled={actionLoading === d._id}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Supprimer le devis"
+                        >
+                          <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
                         </button>
                       </div>
                     </td>

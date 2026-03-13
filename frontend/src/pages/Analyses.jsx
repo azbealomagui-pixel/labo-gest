@@ -129,13 +129,56 @@ const Analyses = () => {
               {filteredAnalyses.length} analyse(s) affichée(s) sur {analyses.length}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/analyses/new')}
-            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <img src={IconAdd} alt="" className="w-5 h-5" />
-            Nouvelle analyse
-          </button>
+          
+          <div className="flex gap-4">
+            {/* ===== BOUTON EXCEL GLOBAL ===== */}
+            <button
+              onClick={() => {
+                try {
+                  const analysesAExporter = filteredAnalyses.map(a => ({
+                    code: a.code,
+                    nom: a.nom?.fr || '',
+                    categorie: a.categorie,
+                    prix: a.prix?.valeur || 0,
+                    devise: a.prix?.devise || 'EUR',
+                    typeEchantillon: a.typeEchantillon,
+                    uniteMesure: a.uniteMesure || '-',
+                    delaiRendu: a.delaiRendu || 24
+                  }));
+
+                  exportToExcel(analysesAExporter, `analyses-${new Date().toISOString().split('T')[0]}`, {
+                    code: 'Code',
+                    nom: 'Nom',
+                    categorie: 'Catégorie',
+                    prix: 'Prix',
+                    devise: 'Devise',
+                    typeEchantillon: 'Type échantillon',
+                    uniteMesure: 'Unité',
+                    delaiRendu: 'Délai (h)'
+                  });
+                  toast.success(`✅ ${analysesAExporter.length} analyses exportées`);
+                } catch (err) {
+                  console.error('❌ Erreur Excel:', err);
+                  toast.error('Erreur génération Excel');
+                }
+              }}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              title="Exporter toutes les analyses"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Excel
+            </button>
+
+            <button
+              onClick={() => navigate('/analyses/new')}
+              className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <img src={IconAdd} alt="" className="w-5 h-5" />
+              Nouvelle analyse
+            </button>
+          </div>
         </div>
 
         {/* Barre de recherche instantanée */}
@@ -216,7 +259,7 @@ const Analyses = () => {
                           <img src={IconEdit} alt="Modifier" className="w-5 h-5" />
                         </button>
 
-                        {/* ===== BOUTON PDF OUVRIR ===== */}
+                        {/* Bouton PDF Ouvrir */}
                         <button
                           onClick={async () => {
                             try {
@@ -240,7 +283,7 @@ const Analyses = () => {
                           </svg>
                         </button>
 
-                        {/* ===== BOUTON PDF TÉLÉCHARGER ===== */}
+                        {/* Bouton PDF Télécharger */}
                         <button
                           onClick={async () => {
                             try {
@@ -258,34 +301,6 @@ const Analyses = () => {
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
-
-                        {/* ===== BOUTON EXCEL ===== */}
-                        <button
-                          onClick={() => {
-                            try {
-                              exportToExcel([a], `analyse-${a.code}`, {
-                                code: 'Code',
-                                'nom.fr': 'Nom',
-                                categorie: 'Catégorie',
-                                'prix.valeur': 'Prix',
-                                'prix.devise': 'Devise',
-                                typeEchantillon: 'Type échantillon',
-                                uniteMesure: 'Unité de mesure',
-                                delaiRendu: 'Délai (heures)'
-                              });
-                              toast.success('✅ Excel généré');
-                            } catch (err) {
-                              console.error('❌ Erreur Excel:', err);
-                              toast.error('Erreur génération Excel');
-                            }
-                          }}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Télécharger Excel"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                         </button>
 

@@ -166,12 +166,59 @@ const Patients = () => {
             </p>
           </div>
           
-          <button
-            onClick={() => navigate('/patients/new')}
-            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl">
-            <img src={IconAdd} alt="Ajouter" className="w-5 h-5" />
-            Nouveau patient
-          </button>
+          <div className="flex gap-4">
+            {/* ===== BOUTON EXCEL GLOBAL ===== */}
+            <button
+              onClick={() => {
+                try {
+                  const patientsAExporter = filteredPatients.map(p => ({
+                    nom: p.nom,
+                    prenom: p.prenom,
+                    email: p.email || '',
+                    telephone: p.telephone,
+                    adresse: p.adresse,
+                    dateNaissance: new Date(p.dateNaissance).toLocaleDateString('fr-FR'),
+                    sexe: p.sexe,
+                    groupeSanguin: p.groupeSanguin || '',
+                    numeroSecuriteSociale: p.numeroSecuriteSociale || '',
+                    observations: p.observations || ''
+                  }));
+
+                  exportToExcel(patientsAExporter, `patients-${new Date().toISOString().split('T')[0]}`, {
+                    nom: 'Nom',
+                    prenom: 'Prénom',
+                    email: 'Email',
+                    telephone: 'Téléphone',
+                    adresse: 'Adresse',
+                    dateNaissance: 'Date naissance',
+                    sexe: 'Sexe',
+                    groupeSanguin: 'Groupe sanguin',
+                    numeroSecuriteSociale: 'N° Sécurité Sociale',
+                    observations: 'Observations'
+                  });
+                  toast.success(`✅ ${patientsAExporter.length} patients exportés`);
+                } catch (err) {
+                  console.error('❌ Erreur Excel:', err);
+                  toast.error('Erreur génération Excel');
+                }
+              }}
+              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl"
+              title="Exporter tous les patients"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Excel
+            </button>
+
+            <button
+              onClick={() => navigate('/patients/new')}
+              className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl"
+            >
+              <img src={IconAdd} alt="Ajouter" className="w-5 h-5" />
+              Nouveau patient
+            </button>
+          </div>
         </div>
 
         {/* ===== BARRE DE RECHERCHE INSTANTANÉE ===== */}
@@ -290,10 +337,10 @@ const Patients = () => {
                         </div>
                       </td>
                       
-                      {/* Colonne Actions */}
+                      {/* Colonne Actions - SANS bouton Excel */}
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        {/* Bouton Modifier (existant) */}
+                        {/* Bouton Modifier */}
                         <button
                           onClick={() => navigate(`/patients/${patient._id}`)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -302,7 +349,7 @@ const Patients = () => {
                           <img src={IconEdit} alt="Modifier" className="w-5 h-5" />
                         </button>
 
-                        {/* ===== BOUTON PDF (Ouvrir) ===== */}
+                        {/* Bouton PDF Ouvrir */}
                         <button
                           onClick={async () => {
                             try {
@@ -326,7 +373,7 @@ const Patients = () => {
                           </svg>
                         </button>
 
-                        {/* ===== BOUTON PDF (Télécharger) ===== */}
+                        {/* Bouton PDF Télécharger */}
                         <button
                           onClick={async () => {
                             try {
@@ -347,37 +394,7 @@ const Patients = () => {
                           </svg>
                         </button>
 
-                        {/* ===== BOUTON EXCEL ===== */}
-                        <button
-                          onClick={() => {
-                            try {
-                              exportToExcel([patient], `patient-${patient.nom}-${patient.prenom}`, {
-                                nom: 'Nom',
-                                prenom: 'Prénom',
-                                email: 'Email',
-                                telephone: 'Téléphone',
-                                adresse: 'Adresse',
-                                dateNaissance: 'Date naissance',
-                                sexe: 'Sexe',
-                                groupeSanguin: 'Groupe sanguin',
-                                numeroSecuriteSociale: 'N° Sécurité Sociale',
-                                observations: 'Observations'
-                              });
-                              toast.success('✅ Fichier Excel généré');
-                            } catch (err) {
-                              console.error('❌ Erreur Excel:', err);
-                              toast.error('Erreur génération Excel');
-                            }
-                          }}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Télécharger Excel"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </button>
-
-                        {/* Bouton Supprimer (existant) */}
+                        {/* Bouton Supprimer */}
                         <button
                           onClick={() => handleDelete(patient._id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
