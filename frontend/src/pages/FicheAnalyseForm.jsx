@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: FicheAnalyseForm
 // RÔLE: Création d'une fiche d'analyses pour un patient
-// AVEC: Validation en temps réel, multi-devise
+// AVEC: Recherche instantanée de code
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
@@ -31,7 +31,6 @@ const FicheAnalyseForm = () => {
   const [analyses, setAnalyses] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedAnalyses, setSelectedAnalyses] = useState([]);
-  const [errors, setErrors] = useState({});
   
   // États pour la saisie en cours
   const [currentCode, setCurrentCode] = useState('');
@@ -70,48 +69,34 @@ const FicheAnalyseForm = () => {
     fetchAnalyses();
   }, [user.laboratoireId]);
 
-  // ===== VALIDATION DU FORMULAIRE =====
-  const validateForm = () => {
-    const newErrors = {};
+  // ===== RECHERCHE INSTANTANÉE DU CODE =====
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentCode.length >= 2) {
+        const analyse = analyses.find(a => 
+          a.code.toLowerCase() === currentCode.toLowerCase()
+        );
 
-    if (!selectedPatient) {
-      newErrors.patient = 'Veuillez sélectionner un patient';
-    }
+        if (analyse) {
+          setCurrentAnalyse({
+            id: analyse._id,
+            code: analyse.code,
+            nom: analyse.nom?.fr || analyse.nom,
+            categorie: analyse.categorie,
+            prixUnitaire: analyse.prix?.valeur || 0,
+            devise: analyse.prix?.devise || 'EUR'
+          });
+          toast.success(`✅ Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
+        } else {
+          setCurrentAnalyse(null);
+        }
+      } else {
+        setCurrentAnalyse(null);
+      }
+    }, 300);
 
-    if (selectedAnalyses.length === 0) {
-      newErrors.analyses = 'Veuillez ajouter au moins une analyse';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // ===== RECHERCHE D'UNE ANALYSE PAR CODE =====
-  const handleCodeSearch = (code) => {
-    if (!code.trim()) {
-      setCurrentAnalyse(null);
-      return;
-    }
-
-    const analyse = analyses.find(a => 
-      a.code.toLowerCase() === code.toLowerCase()
-    );
-
-    if (analyse) {
-      setCurrentAnalyse({
-        id: analyse._id,
-        code: analyse.code,
-        nom: analyse.nom?.fr || analyse.nom,
-        categorie: analyse.categorie,
-        prixUnitaire: analyse.prix?.valeur || 0,
-        devise: analyse.prix?.devise || 'EUR'
-      });
-      toast.success(`✅ Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
-    } else {
-      setCurrentAnalyse(null);
-      toast.info('Aucune analyse trouvée avec ce code');
-    }
-  };
+    return () => clearTimeout(timer);
+  }, [currentCode, analyses]);
 
   // ===== AJOUTER L'ANALYSE COURANTE À LA LISTE =====
   const addCurrentToFiche = () => {
@@ -137,11 +122,6 @@ const FicheAnalyseForm = () => {
     setCurrentCode('');
     setCurrentAnalyse(null);
     setCurrentQuantite(1);
-    
-    // Effacer l'erreur si présente
-    if (errors.analyses) {
-      setErrors(prev => ({ ...prev, analyses: undefined }));
-    }
     
     toast.success('✅ Analyse ajoutée à la liste');
   };
@@ -179,8 +159,13 @@ const FicheAnalyseForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
+    if (!selectedPatient) {
+      toast.error('Veuillez sélectionner un patient');
+      return;
+    }
+
+    if (selectedAnalyses.length === 0) {
+      toast.error('Veuillez ajouter au moins une analyse');
       return;
     }
 
@@ -252,20 +237,6 @@ const FicheAnalyseForm = () => {
 
           <h1 className="text-2xl font-bold mb-6">Nouvelle fiche d'analyses</h1>
 
-          {/* ===== MESSAGES D'ERREUR ===== */}
-          {Object.keys(errors).length > 0 && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600 font-medium">
-                Veuillez corriger les erreurs suivantes :
-              </p>
-              <ul className="mt-2 list-disc list-inside text-sm text-red-600">
-                {Object.values(errors).map((err, idx) => (
-                  <li key={idx}>{err}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit}>
             
             {/* ===== SECTION 1 : PATIENT ===== */}
@@ -291,10 +262,7 @@ const FicheAnalyseForm = () => {
                   filteredPatients.map(p => (
                     <div
                       key={p._id}
-                      onClick={() => {
-                        setSelectedPatient(p);
-                        setErrors(prev => ({ ...prev, patient: undefined }));
-                      }}
+                      onClick={() => setSelectedPatient(p)}
                       className={`p-3 cursor-pointer hover:bg-gray-50 border-b transition-colors ${
                         selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
                       }`}
@@ -314,7 +282,7 @@ const FicheAnalyseForm = () => {
               )}
             </div>
 
-            {/* ===== SECTION 2 : AJOUT D'ANALYSE ===== */}
+            {/* ===== SECTION 2 : AJOUT D'ANALYSE (RECHERCHE INSTANTANÉE) ===== */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-4">2. Ajouter une analyse</h2>
               
@@ -325,9 +293,8 @@ const FicheAnalyseForm = () => {
                     type="text"
                     value={currentCode}
                     onChange={(e) => setCurrentCode(e.target.value)}
-                    onBlur={() => handleCodeSearch(currentCode)}
                     className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                    placeholder="Ex: GLY002"
+                    placeholder="Tapez 2+ caractères..."
                   />
                 </div>
                 
@@ -383,7 +350,7 @@ const FicheAnalyseForm = () => {
                       className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
                     >
                       <img src={IconAdd} alt="" className="w-5 h-5" />
-                      Ajouter à la liste
+                      Ajouter
                     </button>
                   </div>
                 </div>
@@ -493,7 +460,7 @@ const FicheAnalyseForm = () => {
                 disabled={loading || !selectedPatient || selectedAnalyses.length === 0}
                 className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Création...' : 'Créer la fiche d\'analyses'}
+                {loading ? 'Création...' : 'Créer la fiche'}
               </button>
               <button
                 type="button"
