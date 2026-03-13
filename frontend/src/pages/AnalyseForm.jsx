@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: AnalyseForm
 // RÔLE: Création/édition d'une analyse (catalogue)
-// VERSION: Finale avec normes médicales
+// AVEC: Validation en temps réel et normes médicales
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
@@ -44,6 +44,7 @@ const AnalyseForm = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
     code: '',
     nom: { fr: '', en: '', es: '' },
@@ -66,6 +67,40 @@ const AnalyseForm = () => {
     uniteMesure: ''
   });
 
+  // ===== VALIDATION EN TEMPS RÉEL =====
+  const validateField = (name, value) => {
+    const newErrors = { ...errors };
+
+    if (name === 'code') {
+      if (!value.trim()) {
+        newErrors.code = 'Le code est obligatoire';
+      } else if (value.trim().length < 3) {
+        newErrors.code = 'Le code doit contenir au moins 3 caractères';
+      } else {
+        delete newErrors.code;
+      }
+    }
+
+    if (name === 'nom.fr') {
+      if (!value.trim()) {
+        newErrors['nom.fr'] = 'Le nom est obligatoire';
+      } else {
+        delete newErrors['nom.fr'];
+      }
+    }
+
+    if (name === 'prix.valeur') {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        newErrors['prix.valeur'] = 'Le prix doit être supérieur à 0';
+      } else {
+        delete newErrors['prix.valeur'];
+      }
+    }
+
+    setErrors(newErrors);
+  };
+
   // ===== CHARGEMENT EN MODE ÉDITION =====
   useEffect(() => {
     if (id) {
@@ -75,7 +110,7 @@ const AnalyseForm = () => {
           const response = await api.get(`/analyses/${id}`);
           setFormData(response.data.analyse);
         } catch (err) {
-          console.error('Erreur chargement:', err);
+          console.error('❌ Erreur chargement:', err);
           toast.error('Impossible de charger l\'analyse');
           navigate('/analyses');
         } finally {
@@ -97,6 +132,7 @@ const AnalyseForm = () => {
         ...prev,
         nom: { ...prev.nom, [lang]: value }
       }));
+      validateField(name, value);
     } 
     // Gestion du prix
     else if (name === 'prix.valeur') {
@@ -104,6 +140,7 @@ const AnalyseForm = () => {
         ...prev,
         prix: { ...prev.prix, valeur: parseFloat(value) || 0 }
       }));
+      validateField(name, value);
     }
     else if (name === 'prix.devise') {
       setFormData(prev => ({
@@ -139,12 +176,37 @@ const AnalyseForm = () => {
     // Autres champs
     else {
       setFormData(prev => ({ ...prev, [name]: value }));
+      validateField(name, value);
     }
+  };
+
+  // ===== VALIDATION DU FORMULAIRE COMPLET =====
+  const validateForm = () => {
+    const newErrors = {};
+    let isValid = true;
+
+    if (!formData.code?.trim()) {
+      newErrors.code = 'Le code est obligatoire';
+      isValid = false;
+    }
+
+    if (!formData.nom.fr?.trim()) {
+      newErrors['nom.fr'] = 'Le nom est obligatoire';
+      isValid = false;
+    }
+
+    if (!formData.prix.valeur || formData.prix.valeur <= 0) {
+      newErrors['prix.valeur'] = 'Le prix doit être supérieur à 0';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
   };
 
   // ===== NETTOYAGE DES DONNÉES AVANT ENVOI =====
   const nettoyerDonnees = () => {
-    // Nettoyer les valeurs de référence (enlever les champs vides)
+    // Nettoyer les valeurs de référence
     const valeursReferenceNettoyees = {};
     
     ['homme', 'femme', 'enfant'].forEach(categorie => {
@@ -158,10 +220,10 @@ const AnalyseForm = () => {
       }
     });
 
-    // Nettoyer les normes médicales (garder seulement les non vides)
+    // Nettoyer les normes médicales
     const normesMedicalesNettoyees = {};
     Object.entries(formData.normesMedicales).forEach(([key, value]) => {
-      if (value.trim()) {
+      if (value?.trim()) {
         normesMedicalesNettoyees[key] = value.trim();
       }
     });
@@ -192,25 +254,24 @@ const AnalyseForm = () => {
   // ===== SOUMISSION =====
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Veuillez corriger les erreurs dans le formulaire');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Validation rapide
-      if (!formData.code || !formData.nom.fr || !formData.categorie || !formData.prix.valeur || !formData.typeEchantillon) {
-        toast.error('Veuillez remplir tous les champs obligatoires');
-        setLoading(false);
-        return;
-      }
-
       const dataToSend = nettoyerDonnees();
-      console.log('📤 Envoi (nettoyé):', JSON.stringify(dataToSend, null, 2));
+      console.log('📤 Envoi:', JSON.stringify(dataToSend, null, 2));
 
       if (id) {
         await api.put(`/analyses/${id}`, dataToSend);
-        toast.success('Analyse modifiée avec succès');
+        toast.success('✅ Analyse modifiée avec succès');
       } else {
         await api.post('/analyses', dataToSend);
-        toast.success('Analyse créée avec succès');
+        toast.success('✅ Analyse créée avec succès');
       }
       
       navigate('/analyses');
@@ -218,7 +279,7 @@ const AnalyseForm = () => {
       console.error('❌ Erreur:', err);
       
       if (err.response?.status === 409) {
-        toast.error('Ce code existe déjà');
+        toast.error('Ce code existe déjà pour ce laboratoire');
       } else if (err.response?.status === 400) {
         toast.error(err.response.data.message || 'Données invalides');
       } else {
@@ -227,6 +288,70 @@ const AnalyseForm = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ===== RENDU D'UN CHAMP AVEC ERREUR =====
+  const renderField = (label, name, type = 'text', required = false, options = null, placeholder = '') => {
+    const hasError = errors[name];
+    const value = name.includes('.') 
+      ? name.split('.').reduce((obj, key) => obj?.[key], formData) 
+      : formData[name];
+
+    return (
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        
+        {options ? (
+          <select
+            name={name}
+            value={value}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 border rounded-lg ${
+              hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+          >
+            {options.map(opt => (
+              <option key={opt.value || opt} value={opt.value || opt}>
+                {opt.label || opt}
+              </option>
+            ))}
+          </select>
+        ) : type === 'textarea' ? (
+          <textarea
+            name={name}
+            value={value}
+            onChange={handleChange}
+            rows="3"
+            className={`w-full px-4 py-2 border rounded-lg ${
+              hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+            placeholder={placeholder}
+          />
+        ) : (
+          <input
+            type={type}
+            name={name}
+            value={value}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 border rounded-lg ${
+              hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+            placeholder={placeholder}
+          />
+        )}
+        
+        {hasError && (
+          <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            {errors[name]}
+          </p>
+        )}
+      </div>
+    );
   };
 
   if (loading && id) {
@@ -270,59 +395,13 @@ const AnalyseForm = () => {
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Identification</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="code"
-                    value={formData.code}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                    placeholder="Ex: GLY001"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Nom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="nom.fr"
-                    value={formData.nom.fr}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
-                    placeholder="Nom en français"
-                  />
-                </div>
+                {renderField('Code', 'code', 'text', true, null, 'Ex: GLY001')}
+                {renderField('Nom (FR)', 'nom.fr', 'text', true, null, 'Nom en français')}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Nom (EN) - optionnel</label>
-                  <input
-                    type="text"
-                    name="nom.en"
-                    value={formData.nom.en}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border rounded-lg"
-                    placeholder="Pour export international"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Nom (ES) - optionnel</label>
-                  <input
-                    type="text"
-                    name="nom.es"
-                    value={formData.nom.es}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border rounded-lg"
-                    placeholder="Pour export international"
-                  />
-                </div>
+                {renderField('Nom (EN) - optionnel', 'nom.en', 'text', false, null, 'Pour export international')}
+                {renderField('Nom (ES) - optionnel', 'nom.es', 'text', false, null, 'Pour export international')}
               </div>
             </div>
 
@@ -331,38 +410,8 @@ const AnalyseForm = () => {
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Caractéristiques</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Catégorie <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="categorie"
-                    value={formData.categorie}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  >
-                    {CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Type échantillon <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="typeEchantillon"
-                    value={formData.typeEchantillon}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  >
-                    {ECHANTILLONS.map(e => (
-                      <option key={e} value={e}>{e}</option>
-                    ))}
-                  </select>
-                </div>
+                {renderField('Catégorie', 'categorie', 'select', true, CATEGORIES)}
+                {renderField('Type échantillon', 'typeEchantillon', 'select', true, ECHANTILLONS)}
               </div>
             </div>
 
@@ -371,21 +420,7 @@ const AnalyseForm = () => {
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Tarification</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Prix unitaire <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="prix.valeur"
-                    value={formData.prix.valeur}
-                    onChange={handleChange}
-                    required
-                    min="0"
-                    step="0.01"
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
+                {renderField('Prix unitaire', 'prix.valeur', 'number', true, null, '0')}
                 <div>
                   <label className="block text-sm font-medium mb-2">Devise</label>
                   <select
@@ -409,98 +444,37 @@ const AnalyseForm = () => {
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Valeurs de référence (optionnel)</h2>
               
               <div className="space-y-4">
-                {/* Homme */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Homme</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      name="valeursReference.homme.min"
-                      value={formData.valeursReference.homme.min}
-                      onChange={handleChange}
-                      placeholder="Min"
-                      className="px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      name="valeursReference.homme.max"
-                      value={formData.valeursReference.homme.max}
-                      onChange={handleChange}
-                      placeholder="Max"
-                      className="px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      name="valeursReference.homme.texte"
-                      value={formData.valeursReference.homme.texte}
-                      onChange={handleChange}
-                      placeholder="Texte libre"
-                      className="px-3 py-2 border rounded"
-                    />
+                {['homme', 'femme', 'enfant'].map(categorie => (
+                  <div key={categorie} className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-medium mb-2 capitalize">{categorie}</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <input
+                        type="text"
+                        name={`valeursReference.${categorie}.min`}
+                        value={formData.valeursReference[categorie].min}
+                        onChange={handleChange}
+                        placeholder="Min"
+                        className="px-3 py-2 border rounded"
+                      />
+                      <input
+                        type="text"
+                        name={`valeursReference.${categorie}.max`}
+                        value={formData.valeursReference[categorie].max}
+                        onChange={handleChange}
+                        placeholder="Max"
+                        className="px-3 py-2 border rounded"
+                      />
+                      <input
+                        type="text"
+                        name={`valeursReference.${categorie}.texte`}
+                        value={formData.valeursReference[categorie].texte}
+                        onChange={handleChange}
+                        placeholder="Texte libre"
+                        className="px-3 py-2 border rounded"
+                      />
+                    </div>
                   </div>
-                </div>
-
-                {/* Femme */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Femme</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      name="valeursReference.femme.min"
-                      value={formData.valeursReference.femme.min}
-                      onChange={handleChange}
-                      placeholder="Min"
-                      className="px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      name="valeursReference.femme.max"
-                      value={formData.valeursReference.femme.max}
-                      onChange={handleChange}
-                      placeholder="Max"
-                      className="px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      name="valeursReference.femme.texte"
-                      value={formData.valeursReference.femme.texte}
-                      onChange={handleChange}
-                      placeholder="Texte libre"
-                      className="px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
-
-                {/* Enfant */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Enfant</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      name="valeursReference.enfant.min"
-                      value={formData.valeursReference.enfant.min}
-                      onChange={handleChange}
-                      placeholder="Min"
-                      className="px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      name="valeursReference.enfant.max"
-                      value={formData.valeursReference.enfant.max}
-                      onChange={handleChange}
-                      placeholder="Max"
-                      className="px-3 py-2 border rounded"
-                    />
-                    <input
-                      type="text"
-                      name="valeursReference.enfant.texte"
-                      value={formData.valeursReference.enfant.texte}
-                      onChange={handleChange}
-                      placeholder="Texte libre"
-                      className="px-3 py-2 border rounded"
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -509,63 +483,10 @@ const AnalyseForm = () => {
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Normes médicales (optionnel)</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Code LOINC
-                    <span className="text-xs text-gray-500 ml-2">Identifiant universel</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="normesMedicales.loinc"
-                    value={formData.normesMedicales.loinc}
-                    onChange={handleChange}
-                    placeholder="Ex: 2345-7"
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Code SNOMED CT
-                    <span className="text-xs text-gray-500 ml-2">Terminologie clinique</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="normesMedicales.snomed"
-                    value={formData.normesMedicales.snomed}
-                    onChange={handleChange}
-                    placeholder="Ex: 250560003"
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Certification ISO 15189
-                  </label>
-                  <input
-                    type="text"
-                    name="normesMedicales.iso15189"
-                    value={formData.normesMedicales.iso15189}
-                    onChange={handleChange}
-                    placeholder="Ex: LAB-12345"
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Autres normes
-                  </label>
-                  <input
-                    type="text"
-                    name="normesMedicales.autres"
-                    value={formData.normesMedicales.autres}
-                    onChange={handleChange}
-                    placeholder="CISMeF, HPO, etc."
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
+                {renderField('Code LOINC', 'normesMedicales.loinc', 'text', false, null, 'Ex: 2345-7')}
+                {renderField('Code SNOMED CT', 'normesMedicales.snomed', 'text', false, null, 'Ex: 250560003')}
+                {renderField('Certification ISO 15189', 'normesMedicales.iso15189', 'text', false, null, 'Ex: LAB-12345')}
+                {renderField('Autres normes', 'normesMedicales.autres', 'text', false, null, 'CISMeF, HPO, etc.')}
               </div>
             </div>
 
@@ -574,48 +495,27 @@ const AnalyseForm = () => {
               <h2 className="text-lg font-semibold mb-4 text-primary-600">Informations complémentaires</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Délai (heures)</label>
-                  <input
-                    type="number"
-                    name="delaiRendu"
-                    value={formData.delaiRendu}
-                    onChange={handleChange}
-                    min="1"
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Unité de mesure</label>
-                  <input
-                    type="text"
-                    name="uniteMesure"
-                    value={formData.uniteMesure}
-                    onChange={handleChange}
-                    placeholder="ex: g/L, mmol/L"
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
+                {renderField('Délai (heures)', 'delaiRendu', 'number', false, null, '24')}
+                {renderField('Unité de mesure', 'uniteMesure', 'text', false, null, 'ex: g/L, mmol/L')}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Instructions</label>
-                <textarea
-                  name="instructions"
-                  value={formData.instructions}
-                  onChange={handleChange}
-                  rows="3"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  placeholder="Conditions particulières, préparation du patient..."
-                />
-              </div>
+              {renderField('Instructions', 'instructions', 'textarea', false, null, 'Conditions particulières...')}
             </div>
+
+            {/* Résumé des erreurs */}
+            {Object.keys(errors).length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600 font-medium">
+                  Veuillez corriger les {Object.keys(errors).length} erreur(s) avant de soumettre
+                </p>
+              </div>
+            )}
 
             {/* Boutons d'action */}
             <div className="flex gap-4 pt-6">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || Object.keys(errors).length > 0}
                 className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
               >
                 {loading ? 'Enregistrement...' : (id ? 'Modifier' : 'Créer')}

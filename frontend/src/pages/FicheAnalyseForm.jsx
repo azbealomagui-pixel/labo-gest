@@ -1,7 +1,9 @@
 // ===========================================
 // PAGE: FicheAnalyseForm
 // RÔLE: Création d'une fiche d'analyses pour un patient
+// AVEC: Validation en temps réel, multi-devise
 // ===========================================
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -9,7 +11,7 @@ import api from '../services/api';
 import useAuth from '../hooks/useAuth';
 import { IconSearch, IconAdd, IconDelete } from '../assets';
 
-// Liste des devises
+// ===== LISTE DES DEVISES =====
 const CURRENCIES = [
   { code: 'EUR', symbole: '€', nom: 'Euro' },
   { code: 'USD', symbole: '$', nom: 'Dollar américain' },
@@ -28,9 +30,10 @@ const FicheAnalyseForm = () => {
   const [patients, setPatients] = useState([]);
   const [analyses, setAnalyses] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [selectedAnalyses, setSelectedAnalyses] = useState([]); // Liste en cours
+  const [selectedAnalyses, setSelectedAnalyses] = useState([]);
+  const [errors, setErrors] = useState({});
   
-  // État pour la saisie en cours
+  // États pour la saisie en cours
   const [currentCode, setCurrentCode] = useState('');
   const [currentAnalyse, setCurrentAnalyse] = useState(null);
   const [currentQuantite, setCurrentQuantite] = useState(1);
@@ -39,35 +42,51 @@ const FicheAnalyseForm = () => {
   const [devise, setDevise] = useState('EUR');
   const [notes, setNotes] = useState('');
 
-  // Charger les patients
+  // ===== CHARGEMENT DES PATIENTS =====
   useEffect(() => {
     const fetchPatients = async () => {
       try {
         const response = await api.get(`/patients/labo/${user.laboratoireId}`);
         setPatients(response.data.patients || []);
       } catch (err) {
-        console.error('Erreur chargement patients:', err);
+        console.error('❌ Erreur chargement patients:', err);
         toast.error('Erreur chargement patients');
       }
     };
     fetchPatients();
   }, [user.laboratoireId]);
 
-  // Charger le catalogue d'analyses
+  // ===== CHARGEMENT DES ANALYSES =====
   useEffect(() => {
     const fetchAnalyses = async () => {
       try {
         const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
         setAnalyses(response.data.analyses || []);
       } catch (err) {
-        console.error('Erreur chargement analyses:', err);
+        console.error('❌ Erreur chargement analyses:', err);
         toast.error('Erreur chargement catalogue');
       }
     };
     fetchAnalyses();
   }, [user.laboratoireId]);
 
-  // Rechercher une analyse par code
+  // ===== VALIDATION DU FORMULAIRE =====
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!selectedPatient) {
+      newErrors.patient = 'Veuillez sélectionner un patient';
+    }
+
+    if (selectedAnalyses.length === 0) {
+      newErrors.analyses = 'Veuillez ajouter au moins une analyse';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ===== RECHERCHE D'UNE ANALYSE PAR CODE =====
   const handleCodeSearch = (code) => {
     if (!code.trim()) {
       setCurrentAnalyse(null);
@@ -75,26 +94,26 @@ const FicheAnalyseForm = () => {
     }
 
     const analyse = analyses.find(a => 
-  a.code.toLowerCase() === code.toLowerCase()
-);
+      a.code.toLowerCase() === code.toLowerCase()
+    );
 
-if (analyse) {
-  setCurrentAnalyse({
-    id: analyse._id,
-    code: analyse.code,
-    nom: analyse.nom?.fr || analyse.nom,
-    categorie: analyse.categorie,
-    prixUnitaire: analyse.prix?.valeur || 0,  // ← PRIX AUTOMATIQUE
-    devise: analyse.prix?.devise || 'EUR'
-  });
-      toast.success(`Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
+    if (analyse) {
+      setCurrentAnalyse({
+        id: analyse._id,
+        code: analyse.code,
+        nom: analyse.nom?.fr || analyse.nom,
+        categorie: analyse.categorie,
+        prixUnitaire: analyse.prix?.valeur || 0,
+        devise: analyse.prix?.devise || 'EUR'
+      });
+      toast.success(`✅ Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
     } else {
       setCurrentAnalyse(null);
       toast.info('Aucune analyse trouvée avec ce code');
     }
   };
 
-  // Ajouter l'analyse courante à la liste
+  // ===== AJOUTER L'ANALYSE COURANTE À LA LISTE =====
   const addCurrentToFiche = () => {
     if (!currentAnalyse) {
       toast.error('Veuillez d\'abord rechercher une analyse valide');
@@ -114,31 +133,54 @@ if (analyse) {
 
     setSelectedAnalyses([...selectedAnalyses, nouvelleLigne]);
     
-    // Réinitialiser le formulaire de saisie
+    // Réinitialiser le formulaire
     setCurrentCode('');
     setCurrentAnalyse(null);
     setCurrentQuantite(1);
     
-    toast.success('Analyse ajoutée à la liste');
+    // Effacer l'erreur si présente
+    if (errors.analyses) {
+      setErrors(prev => ({ ...prev, analyses: undefined }));
+    }
+    
+    toast.success('✅ Analyse ajoutée à la liste');
   };
 
+  // ===== SUPPRIMER UNE ANALYSE =====
+  const removeAnalyse = (index) => {
+    const filtered = selectedAnalyses.filter((_, i) => i !== index);
+    setSelectedAnalyses(filtered);
+    toast.info('Analyse retirée de la liste');
+  };
 
-  // Calculer le total général
+  // ===== METTRE À JOUR LA QUANTITÉ =====
+  const updateQuantite = (index, newQuantite) => {
+    const quantite = parseInt(newQuantite) || 1;
+    if (quantite < 1) return;
+
+    const updatedList = [...selectedAnalyses];
+    updatedList[index].quantite = quantite;
+    updatedList[index].prixTotal = quantite * updatedList[index].prixUnitaire;
+    setSelectedAnalyses(updatedList);
+  };
+
+  // ===== CALCULER LE TOTAL GÉNÉRAL =====
   const calculerTotalGeneral = () => {
     return selectedAnalyses.reduce((sum, a) => sum + a.prixTotal, 0);
   };
 
-  // Soumettre la fiche
+  // ===== RECHERCHE FILTRÉE DES PATIENTS =====
+  const filteredPatients = patients.filter(p => 
+    p.nom.toLowerCase().includes(searchPatient.toLowerCase()) ||
+    p.prenom.toLowerCase().includes(searchPatient.toLowerCase())
+  );
+
+  // ===== SOUMISSION =====
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedPatient) {
-      toast.error('Veuillez sélectionner un patient');
-      return;
-    }
-
-    if (selectedAnalyses.length === 0) {
-      toast.error('Veuillez ajouter au moins une analyse');
+    if (!validateForm()) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
@@ -169,7 +211,7 @@ if (analyse) {
       const response = await api.post('/fiches-analyses', ficheData);
       
       if (response.data.success) {
-        toast.success('Fiche d\'analyse créée avec succès');
+        toast.success('✅ Fiche d\'analyse créée avec succès');
         navigate('/patients');
       }
     } catch (err) {
@@ -185,27 +227,48 @@ if (analyse) {
       <div className="max-w-6xl mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg p-8">
           
-          {/* Navigation */}
+          {/* ===== NAVIGATION ===== */}
           <div className="mb-6 flex items-center gap-4 border-b pb-4">
             <button 
               onClick={() => navigate('/patients')}
-              className="text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
-              ← Retour patients
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Retour patients
             </button>
-            <span>|</span>
+            <span className="text-gray-300">|</span>
             <button 
               onClick={() => navigate('/dashboard')}
-              className="text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
-              🏠 Dashboard
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Dashboard
             </button>
           </div>
 
           <h1 className="text-2xl font-bold mb-6">Nouvelle fiche d'analyses</h1>
 
+          {/* ===== MESSAGES D'ERREUR ===== */}
+          {Object.keys(errors).length > 0 && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600 font-medium">
+                Veuillez corriger les erreurs suivantes :
+              </p>
+              <ul className="mt-2 list-disc list-inside text-sm text-red-600">
+                {Object.values(errors).map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
-            {/* Sélection patient */}
+            
+            {/* ===== SECTION 1 : PATIENT ===== */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-4">1. Patient</h2>
               <div className="relative mb-4">
@@ -214,38 +277,44 @@ if (analyse) {
                   placeholder="Rechercher un patient..."
                   value={searchPatient}
                   onChange={(e) => setSearchPatient(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                 />
-                <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5" />
+                <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5 opacity-50" />
               </div>
 
               <div className="border rounded-lg max-h-40 overflow-y-auto">
-                {patients
-                  .filter(p => 
-                    p.nom.toLowerCase().includes(searchPatient.toLowerCase()) ||
-                    p.prenom.toLowerCase().includes(searchPatient.toLowerCase())
-                  )
-                  .map(p => (
+                {filteredPatients.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    Aucun patient trouvé
+                  </div>
+                ) : (
+                  filteredPatients.map(p => (
                     <div
                       key={p._id}
-                      onClick={() => setSelectedPatient(p)}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 border-b ${
+                      onClick={() => {
+                        setSelectedPatient(p);
+                        setErrors(prev => ({ ...prev, patient: undefined }));
+                      }}
+                      className={`p-3 cursor-pointer hover:bg-gray-50 border-b transition-colors ${
                         selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
                       }`}
                     >
-                      {p.nom} {p.prenom} - {p.telephone}
+                      <div className="font-medium">{p.nom} {p.prenom}</div>
+                      <div className="text-sm text-gray-600">{p.telephone}</div>
                     </div>
-                  ))}
+                  ))
+                )}
               </div>
 
               {selectedPatient && (
-                <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                  Patient sélectionné : {selectedPatient.nom} {selectedPatient.prenom}
+                <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <span className="font-medium">Patient sélectionné :</span>{' '}
+                  {selectedPatient.nom} {selectedPatient.prenom}
                 </div>
               )}
             </div>
 
-            {/* Saisie d'une analyse */}
+            {/* ===== SECTION 2 : AJOUT D'ANALYSE ===== */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-4">2. Ajouter une analyse</h2>
               
@@ -257,7 +326,7 @@ if (analyse) {
                     value={currentCode}
                     onChange={(e) => setCurrentCode(e.target.value)}
                     onBlur={() => handleCodeSearch(currentCode)}
-                    className="w-full px-4 py-2 border rounded-lg"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                     placeholder="Ex: GLY002"
                   />
                 </div>
@@ -304,14 +373,14 @@ if (analyse) {
                       min="1"
                       value={currentQuantite}
                       onChange={(e) => setCurrentQuantite(parseInt(e.target.value) || 1)}
-                      className="w-full px-4 py-2 border rounded-lg"
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div className="flex items-end">
                     <button
                       type="button"
                       onClick={addCurrentToFiche}
-                      className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+                      className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
                     >
                       <img src={IconAdd} alt="" className="w-5 h-5" />
                       Ajouter à la liste
@@ -321,7 +390,7 @@ if (analyse) {
               )}
             </div>
 
-            {/* Liste des analyses sélectionnées */}
+            {/* ===== SECTION 3 : LISTE DES ANALYSES ===== */}
             {selectedAnalyses.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-lg font-semibold mb-4">3. Analyses sélectionnées</h2>
@@ -329,14 +398,14 @@ if (analyse) {
                   <table className="min-w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-2 text-left">#</th>
-                        <th className="px-4 py-2 text-left">Code</th>
-                        <th className="px-4 py-2 text-left">Analyse</th>
-                        <th className="px-4 py-2 text-left">Catégorie</th>
-                        <th className="px-4 py-2 text-right">Prix unitaire</th>
-                        <th className="px-4 py-2 text-center">Quantité</th>
-                        <th className="px-4 py-2 text-right">Total</th>
-                        <th className="px-4 py-2 text-center">Action</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Analyse</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Catégorie</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Prix unitaire</th>
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Qté</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -346,20 +415,16 @@ if (analyse) {
                           <td className="px-4 py-2 font-mono text-sm">{a.code}</td>
                           <td className="px-4 py-2">{a.nom}</td>
                           <td className="px-4 py-2">{a.categorie}</td>
-                          <td className="px-4 py-2 text-right">{a.prixUnitaire.toLocaleString()} {a.devise}</td>
+                          <td className="px-4 py-2 text-right">
+                            {a.prixUnitaire.toLocaleString()} {a.devise}
+                          </td>
                           <td className="px-4 py-2 text-center">
                             <input
                               type="number"
                               min="1"
                               value={a.quantite}
-                              onChange={(e) => {
-                                const newQuantite = parseInt(e.target.value) || 1;
-                                const updatedList = [...selectedAnalyses];
-                                updatedList[index].quantite = newQuantite;
-                                updatedList[index].prixTotal = newQuantite * a.prixUnitaire;
-                                setSelectedAnalyses(updatedList);
-                              }}
-                              className="w-16 px-2 py-1 border rounded text-center"
+                              onChange={(e) => updateQuantite(index, e.target.value)}
+                              className="w-16 px-2 py-1 border rounded text-center text-sm"
                             />
                           </td>
                           <td className="px-4 py-2 text-right font-medium">
@@ -367,11 +432,8 @@ if (analyse) {
                           </td>
                           <td className="px-4 py-2 text-center">
                             <button
-                              onClick={() => {
-                                const filtered = selectedAnalyses.filter((_, i) => i !== index);
-                                setSelectedAnalyses(filtered);
-                              }}
-                              className="text-red-600 hover:text-red-800"
+                              onClick={() => removeAnalyse(index)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                               title="Supprimer"
                             >
                               <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
@@ -395,14 +457,15 @@ if (analyse) {
                 </div>
               </div>
             )}
-            {/* Devise et notes */}
+
+            {/* ===== DEVISE ET NOTES ===== */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium mb-2">Devise</label>
                 <select
                   value={devise}
                   onChange={(e) => setDevise(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                 >
                   {CURRENCIES.map(c => (
                     <option key={c.code} value={c.code}>
@@ -417,25 +480,25 @@ if (analyse) {
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
                   placeholder="Observations..."
                 />
               </div>
             </div>
 
-            {/* Boutons */}
+            {/* ===== BOUTONS ===== */}
             <div className="flex gap-4">
               <button
                 type="submit"
                 disabled={loading || !selectedPatient || selectedAnalyses.length === 0}
-                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Création...' : 'Créer la fiche d\'analyses'}
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/patients')}
-                className="flex-1 bg-gray-200 px-6 py-3 rounded-lg hover:bg-gray-300"
+                className="flex-1 bg-gray-200 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 Annuler
               </button>

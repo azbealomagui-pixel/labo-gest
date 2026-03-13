@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: DevisForm
 // RÔLE: Création d'un devis (patient + analyses)
-// VERSION: Finale avec multi-devise corrigée
+// AVEC: Validation en temps réel, multi-devise
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +11,7 @@ import api from '../services/api';
 import useAuth from '../hooks/useAuth';
 import { IconAdd, IconDelete, IconSearch } from '../assets';
 
-// Liste des devises disponibles (extensible)
+// ===== LISTE DES DEVISES DISPONIBLES =====
 const CURRENCIES = [
   { code: 'EUR', symbole: '€', nom: 'Euro' },
   { code: 'USD', symbole: '$', nom: 'Dollar américain' },
@@ -35,8 +35,9 @@ const DevisForm = () => {
   const [searchAnalyse, setSearchAnalyse] = useState('');
   const [remise, setRemise] = useState(0);
   const [selectedDevise, setSelectedDevise] = useState('EUR');
+  const [errors, setErrors] = useState({});
 
-  // Charger les patients
+  // ===== CHARGEMENT DES PATIENTS =====
   useEffect(() => {
     const fetchPatients = async () => {
       try {
@@ -50,7 +51,7 @@ const DevisForm = () => {
     fetchPatients();
   }, [user.laboratoireId]);
 
-  // Charger les analyses
+  // ===== CHARGEMENT DES ANALYSES =====
   useEffect(() => {
     const fetchAnalyses = async () => {
       try {
@@ -64,28 +65,58 @@ const DevisForm = () => {
     fetchAnalyses();
   }, [user.laboratoireId]);
 
-  // Ajouter une analyse au panier
+  // ===== VALIDATION DU FORMULAIRE =====
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!selectedPatient) {
+      newErrors.patient = 'Veuillez sélectionner un patient';
+    }
+
+    if (selectedAnalyses.length === 0) {
+      newErrors.analyses = 'Veuillez ajouter au moins une analyse';
+    }
+
+    if (remise < 0 || remise > 100) {
+      newErrors.remise = 'La remise doit être entre 0 et 100%';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ===== AJOUTER UNE ANALYSE =====
   const addAnalyse = (analyse) => {
     const exists = selectedAnalyses.find(a => a._id === analyse._id);
+    
     if (exists) {
       setSelectedAnalyses(selectedAnalyses.map(a =>
         a._id === analyse._id ? { ...a, quantite: a.quantite + 1 } : a
       ));
+      toast.info(`Quantité augmentée pour ${analyse.code}`);
     } else {
       setSelectedAnalyses([...selectedAnalyses, { 
         ...analyse, 
         quantite: 1,
         devise: analyse.prix?.devise || 'EUR'
       }]);
+      toast.success(`${analyse.code} ajouté au devis`);
+    }
+    
+    // Effacer l'erreur si présente
+    if (errors.analyses) {
+      setErrors(prev => ({ ...prev, analyses: undefined }));
     }
   };
 
-  // Retirer une analyse du panier
+  // ===== RETIRER UNE ANALYSE =====
   const removeAnalyse = (id) => {
+    const analyse = selectedAnalyses.find(a => a._id === id);
     setSelectedAnalyses(selectedAnalyses.filter(a => a._id !== id));
+    toast.info(`${analyse.code} retiré du devis`);
   };
 
-  // Mettre à jour la quantité d'une analyse
+  // ===== METTRE À JOUR LA QUANTITÉ =====
   const updateQuantite = (id, quantite) => {
     const newQuantite = parseInt(quantite) || 1;
     if (newQuantite < 1) return;
@@ -95,7 +126,7 @@ const DevisForm = () => {
     ));
   };
 
-  // Calculer le total du devis
+  // ===== CALCULER LE TOTAL =====
   const calculTotal = () => {
     const sousTotal = selectedAnalyses.reduce(
       (sum, a) => sum + (a.prix?.valeur || 0) * a.quantite,
@@ -105,23 +136,30 @@ const DevisForm = () => {
     return total.toFixed(2);
   };
 
-  // Obtenir le libellé d'une devise
+  // ===== LIBELLÉ D'UNE DEVISE =====
   const getDeviseLabel = (code) => {
     const devise = CURRENCIES.find(c => c.code === code);
     return devise ? `${devise.nom} (${devise.symbole})` : code;
   };
 
-  // Soumettre le formulaire
+  // ===== RECHERCHE FILTRÉE DES PATIENTS =====
+  const filteredPatients = patients.filter(p => 
+    p.nom.toLowerCase().includes(searchPatient.toLowerCase()) ||
+    p.prenom.toLowerCase().includes(searchPatient.toLowerCase())
+  );
+
+  // ===== RECHERCHE FILTRÉE DES ANALYSES =====
+  const filteredAnalyses = analyses.filter(a => 
+    a.code.toLowerCase().includes(searchAnalyse.toLowerCase()) ||
+    a.nom?.fr?.toLowerCase().includes(searchAnalyse.toLowerCase())
+  );
+
+  // ===== SOUMISSION =====
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!selectedPatient) {
-      toast.error('Veuillez sélectionner un patient');
-      return;
-    }
-    
-    if (selectedAnalyses.length === 0) {
-      toast.error('Veuillez ajouter au moins une analyse');
+    if (!validateForm()) {
+      toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
@@ -151,7 +189,7 @@ const DevisForm = () => {
       const response = await api.post('/devis', devisData);
       
       if (response.data.success) {
-        toast.success('Devis créé avec succès');
+        toast.success('✅ Devis créé avec succès');
         navigate('/devis');
       }
     } catch (err) {
@@ -167,27 +205,48 @@ const DevisForm = () => {
       <div className="max-w-6xl mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg p-8">
           
-          {/* Navigation */}
+          {/* ===== NAVIGATION ===== */}
           <div className="mb-6 flex items-center gap-4 border-b pb-4">
             <button 
               onClick={() => navigate('/devis')} 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
-              ← Retour liste
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Retour liste
             </button>
             <span className="text-gray-300">|</span>
             <button 
               onClick={() => navigate('/dashboard')} 
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
-              🏠 Dashboard
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Dashboard
             </button>
           </div>
 
           <h1 className="text-2xl font-bold mb-6">Nouveau devis</h1>
 
+          {/* ===== MESSAGES D'ERREUR ===== */}
+          {Object.keys(errors).length > 0 && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600 font-medium">
+                Veuillez corriger les erreurs suivantes :
+              </p>
+              <ul className="mt-2 list-disc list-inside text-sm text-red-600">
+                {Object.values(errors).map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Colonne gauche : Sélection patient */}
+            
+            {/* ===== COLONNE GAUCHE : SÉLECTION PATIENT ===== */}
             <div>
               <h2 className="text-lg font-semibold mb-4">1. Sélectionner un patient</h2>
               
@@ -203,15 +262,18 @@ const DevisForm = () => {
               </div>
 
               <div className="border rounded-lg max-h-60 overflow-y-auto">
-                {patients
-                  .filter(p => 
-                    p.nom.toLowerCase().includes(searchPatient.toLowerCase()) ||
-                    p.prenom.toLowerCase().includes(searchPatient.toLowerCase())
-                  )
-                  .map(p => (
+                {filteredPatients.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    Aucun patient trouvé
+                  </div>
+                ) : (
+                  filteredPatients.map(p => (
                     <div
                       key={p._id}
-                      onClick={() => setSelectedPatient(p)}
+                      onClick={() => {
+                        setSelectedPatient(p);
+                        setErrors(prev => ({ ...prev, patient: undefined }));
+                      }}
                       className={`p-3 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 transition-colors ${
                         selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
                       }`}
@@ -219,7 +281,8 @@ const DevisForm = () => {
                       <div className="font-medium">{p.nom} {p.prenom}</div>
                       <div className="text-sm text-gray-600">{p.telephone}</div>
                     </div>
-                  ))}
+                  ))
+                )}
               </div>
 
               {selectedPatient && (
@@ -230,7 +293,7 @@ const DevisForm = () => {
               )}
             </div>
 
-            {/* Colonne droite : Sélection analyses */}
+            {/* ===== COLONNE DROITE : SÉLECTION ANALYSES ===== */}
             <div>
               <h2 className="text-lg font-semibold mb-4">2. Ajouter des analyses</h2>
               
@@ -246,12 +309,12 @@ const DevisForm = () => {
               </div>
 
               <div className="border rounded-lg max-h-60 overflow-y-auto mb-4">
-                {analyses
-                  .filter(a => 
-                    a.code.toLowerCase().includes(searchAnalyse.toLowerCase()) ||
-                    a.nom?.fr?.toLowerCase().includes(searchAnalyse.toLowerCase())
-                  )
-                  .map(a => (
+                {filteredAnalyses.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    Aucune analyse trouvée
+                  </div>
+                ) : (
+                  filteredAnalyses.map(a => (
                     <div
                       key={a._id}
                       onClick={() => addAnalyse(a)}
@@ -265,10 +328,11 @@ const DevisForm = () => {
                         {a.prix?.valeur || 0} {a.prix?.devise || selectedDevise}
                       </div>
                     </div>
-                  ))}
+                  ))
+                )}
               </div>
 
-              {/* Panier des analyses sélectionnées */}
+              {/* ===== PANIER DES ANALYSES ===== */}
               {selectedAnalyses.length > 0 && (
                 <div className="border rounded-lg p-4 bg-gray-50">
                   <h3 className="font-medium mb-3 flex items-center gap-2">
@@ -307,7 +371,7 @@ const DevisForm = () => {
                     </div>
                   ))}
 
-                  {/* Remise globale */}
+                  {/* ===== REMISE GLOBALE ===== */}
                   <div className="mt-4 flex items-center justify-end gap-4">
                     <label htmlFor="remise" className="text-sm font-medium">
                       Remise globale (%)
@@ -319,12 +383,20 @@ const DevisForm = () => {
                       max="100"
                       step="1"
                       value={remise}
-                      onChange={(e) => setRemise(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setRemise(val);
+                        if (val < 0 || val > 100) {
+                          setErrors(prev => ({ ...prev, remise: 'La remise doit être entre 0 et 100%' }));
+                        } else {
+                          setErrors(prev => ({ ...prev, remise: undefined }));
+                        }
+                      }}
                       className="w-20 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
 
-                  {/* Total général */}
+                  {/* ===== TOTAL GÉNÉRAL ===== */}
                   <div className="mt-4 pt-4 border-t flex justify-between items-center">
                     <span className="text-lg font-semibold">TOTAL GÉNÉRAL</span>
                     <span className="text-2xl font-bold text-primary-600">
@@ -336,7 +408,7 @@ const DevisForm = () => {
             </div>
           </div>
 
-          {/* Sélection de la devise */}
+          {/* ===== SÉLECTION DE LA DEVISE ===== */}
           <div className="mt-6 pt-4 border-t">
             <label htmlFor="devise" className="block text-sm font-medium mb-2">
               Devise du devis
@@ -358,7 +430,7 @@ const DevisForm = () => {
             </p>
           </div>
 
-          {/* Boutons finaux */}
+          {/* ===== BOUTONS ===== */}
           <div className="mt-8 flex gap-4">
             <button
               onClick={handleSubmit}

@@ -1,6 +1,7 @@
 // ===========================================
 // PAGE: PatientForm
 // RÔLE: Formulaire de création/édition de patient
+// AVEC: Validation en temps réel, messages d'erreur
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
@@ -8,14 +9,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
-import { IconAdd } from '../assets';
-//import Navigation from '../components/common/Navigation';
 
 const PatientForm = () => {
   const navigate = useNavigate();
   const { id } = useParams(); // Si id présent, mode édition
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({}); // État pour les erreurs de validation
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -30,34 +30,140 @@ const PatientForm = () => {
     observations: ''
   });
 
-  // Si mode édition, charger les données du patient
-  useEffect(() => {
-  const loadPatient = async () => {
-    if (!id) return;
+  // ===== VALIDATION EN TEMPS RÉEL =====
+  const validateField = (name, value) => {
+    const newErrors = { ...errors };
     
-    try {
-      setLoading(true);
-      const response = await api.get(`/patients/${id}`);
-      setFormData(response.data.patient);
-    } catch (err) {
-      console.error('Erreur chargement patient:', err);
-      toast.error('Impossible de charger les données du patient');
-      navigate('/patients');
-    } finally {
-      setLoading(false);
+    switch (name) {
+      case 'nom':
+      case 'prenom':
+        if (!value.trim()) {
+          newErrors[name] = 'Ce champ est obligatoire';
+        } else if (value.trim().length < 2) {
+          newErrors[name] = 'Minimum 2 caractères';
+        } else {
+          delete newErrors[name];
+        }
+        break;
+        
+      case 'telephone':
+        if (!value.trim()) {
+          newErrors.telephone = 'Le téléphone est obligatoire';
+        } else if (!/^[0-9+\-\s]{8,}$/.test(value)) {
+          newErrors.telephone = 'Format téléphone invalide';
+        } else {
+          delete newErrors.telephone;
+        }
+        break;
+        
+      case 'email':
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          newErrors.email = 'Format email invalide';
+        } else {
+          delete newErrors.email;
+        }
+        break;
+        
+      case 'adresse':
+        if (!value.trim()) {
+          newErrors.adresse = 'L\'adresse est obligatoire';
+        } else {
+          delete newErrors.adresse;
+        }
+        break;
+        
+      case 'dateNaissance':
+        if (!value) {
+          newErrors.dateNaissance = 'La date de naissance est obligatoire';
+        } else {
+          delete newErrors.dateNaissance;
+        }
+        break;
+        
+      default:
+        break;
     }
+    
+    setErrors(newErrors);
   };
 
-  loadPatient();
-}, [id, navigate]); //  Dépendances : id et navigate seulement
+  // ===== CHARGEMENT EN MODE ÉDITION =====
+  useEffect(() => {
+    const loadPatient = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        const response = await api.get(`/patients/${id}`);
+        setFormData(response.data.patient);
+      } catch (err) {
+        console.error('❌ Erreur chargement patient:', err);
+        toast.error('Impossible de charger les données du patient');
+        navigate('/patients');
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    loadPatient();
+  }, [id, navigate]);
+
+  // ===== GESTIONNAIRE DE CHANGEMENT =====
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Gestion spéciale pour les allergies
+    if (name === 'allergies') {
+      setFormData(prev => ({
+        ...prev,
+        allergies: value.split(',').map(a => a.trim()).filter(a => a)
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+    
+    // Valider le champ modifié
+    validateField(name, value);
   };
 
+  // ===== VALIDATION DU FORMULAIRE COMPLET =====
+  const validateForm = () => {
+    const requiredFields = ['nom', 'prenom', 'dateNaissance', 'telephone', 'adresse'];
+    const newErrors = {};
+    let isValid = true;
+
+    requiredFields.forEach(field => {
+      if (!formData[field] || !formData[field].toString().trim()) {
+        newErrors[field] = 'Ce champ est obligatoire';
+        isValid = false;
+      }
+    });
+
+    // Validation email si présent
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Format email invalide';
+      isValid = false;
+    }
+
+    // Validation téléphone
+    if (!/^[0-9+\-\s]{8,}$/.test(formData.telephone)) {
+      newErrors.telephone = 'Format téléphone invalide';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  // ===== SOUMISSION DU FORMULAIRE =====
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Veuillez corriger les erreurs dans le formulaire');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -68,22 +174,77 @@ const PatientForm = () => {
       };
 
       if (id) {
-        // Mode édition
         await api.put(`/patients/${id}`, dataToSend);
-        toast.success('Patient modifié avec succès');
+        toast.success('✅ Patient modifié avec succès');
       } else {
-        // Mode création
         await api.post('/patients', dataToSend);
-        toast.success('Patient créé avec succès');
+        toast.success('✅ Patient créé avec succès');
       }
       
       navigate('/patients');
     } catch (err) {
-      console.error('Erreur sauvegarde:', err);
+      console.error('❌ Erreur sauvegarde:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);
     }
+  };
+
+  // ===== RENDU DU CHAMP AVEC ERREUR =====
+  const renderField = (label, name, type = 'text', required = false, options = null) => {
+    const hasError = errors[name];
+    
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        
+        {options ? (
+          <select
+            name={name}
+            value={formData[name]}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 ${
+              hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+          >
+            {options.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : type === 'textarea' ? (
+          <textarea
+            name={name}
+            value={formData[name]}
+            onChange={handleChange}
+            rows="4"
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 ${
+              hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+          />
+        ) : (
+          <input
+            type={type}
+            name={name}
+            value={formData[name]}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 ${
+              hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+          />
+        )}
+        
+        {hasError && (
+          <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            {errors[name]}
+          </p>
+        )}
+      </div>
+    );
   };
 
   if (loading && id) {
@@ -123,153 +284,53 @@ const PatientForm = () => {
               Tableau de bord
             </button>
           </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">
-              {id ? 'Modifier le patient' : 'Nouveau patient'}
-            </h1>
+
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">
+            {id ? 'Modifier le patient' : 'Nouveau patient'}
+          </h1>
+
           <form onSubmit={handleSubmit} className="space-y-6">
+            
             {/* Identité */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="nom"
-                  value={formData.nom}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prénom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="prenom"
-                  value={formData.prenom}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
+              {renderField('Nom', 'nom', 'text', true)}
+              {renderField('Prénom', 'prenom', 'text', true)}
             </div>
 
             {/* Date naissance et sexe */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date de naissance <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="dateNaissance"
-                  value={formData.dateNaissance}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sexe <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="sexe"
-                  value={formData.sexe}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="M">Masculin</option>
-                  <option value="F">Féminin</option>
-                  <option value="Autre">Autre</option>
-                </select>
-              </div>
+              {renderField('Date de naissance', 'dateNaissance', 'date', true)}
+              {renderField('Sexe', 'sexe', 'select', true, [
+                { value: 'M', label: 'Masculin' },
+                { value: 'F', label: 'Féminin' },
+                { value: 'Autre', label: 'Autre' }
+              ])}
             </div>
 
             {/* Contact */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Téléphone <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  name="telephone"
-                  value={formData.telephone}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
+              {renderField('Téléphone', 'telephone', 'tel', true)}
+              {renderField('Email', 'email', 'email', false)}
             </div>
 
             {/* Adresse */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Adresse <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="adresse"
-                value={formData.adresse}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
+            {renderField('Adresse', 'adresse', 'text', true)}
 
             {/* N° Sécurité Sociale */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Numéro de sécurité sociale
-              </label>
-              <input
-                type="text"
-                name="numeroSecuriteSociale"
-                value={formData.numeroSecuriteSociale}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
+            {renderField('Numéro de sécurité sociale', 'numeroSecuriteSociale', 'text', false)}
 
             {/* Groupe sanguin */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Groupe sanguin
-              </label>
-              <select
-                name="groupeSanguin"
-                value={formData.groupeSanguin}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="Inconnu">Inconnu</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-              </select>
-            </div>
+            {renderField('Groupe sanguin', 'groupeSanguin', 'select', false, [
+              { value: 'Inconnu', label: 'Inconnu' },
+              { value: 'A+', label: 'A+' },
+              { value: 'A-', label: 'A-' },
+              { value: 'B+', label: 'B+' },
+              { value: 'B-', label: 'B-' },
+              { value: 'AB+', label: 'AB+' },
+              { value: 'AB-', label: 'AB-' },
+              { value: 'O+', label: 'O+' },
+              { value: 'O-', label: 'O-' }
+            ])}
 
             {/* Allergies */}
             <div>
@@ -280,35 +341,21 @@ const PatientForm = () => {
                 type="text"
                 name="allergies"
                 value={formData.allergies.join(', ')}
-                onChange={(e) => setFormData({
-                  ...formData,
-                  allergies: e.target.value.split(',').map(a => a.trim()).filter(a => a)
-                })}
+                onChange={handleChange}
                 placeholder="ex: pénicilline, arachides, lactose"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
               />
             </div>
 
             {/* Observations */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Observations
-              </label>
-              <textarea
-                name="observations"
-                value={formData.observations}
-                onChange={handleChange}
-                rows="4"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
+            {renderField('Observations', 'observations', 'textarea', false)}
 
             {/* Boutons */}
             <div className="flex gap-4 pt-4">
               <button
                 type="submit"
-                disabled={loading}
-                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
+                disabled={loading || Object.keys(errors).length > 0}
+                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 {loading ? 'Enregistrement...' : (id ? 'Modifier' : 'Créer')}
               </button>
@@ -320,6 +367,15 @@ const PatientForm = () => {
                 Annuler
               </button>
             </div>
+
+            {/* Résumé des erreurs */}
+            {Object.keys(errors).length > 0 && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600 font-medium">
+                  Veuillez corriger les {Object.keys(errors).length} erreur(s) avant de soumettre
+                </p>
+              </div>
+            )}
           </form>
         </div>
       </div>

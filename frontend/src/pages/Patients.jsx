@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: Patients
 // RÔLE: Liste, recherche et gestion des patients
-// COMPOSANT: Fonctionnel avec hooks
+// AVEC: Recherche instantanée (dès 2 caractères)
 // ===========================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -17,121 +17,90 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
  * Composant de gestion des patients
  * @returns {JSX.Element} Page de liste des patients
  */
-  const Patients = () => {
+const Patients = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
   // États du composant
-  const [patients, setPatients] = useState([]);      // Liste des patients
-  const [loading, setLoading] = useState(true);       // État de chargement
-  const [searchTerm, setSearchTerm] = useState('');   // Terme de recherche
+  const [patients, setPatients] = useState([]);        // Liste complète des patients
+  const [filteredPatients, setFilteredPatients] = useState([]); // Liste filtrée (recherche instantanée)
+  const [loading, setLoading] = useState(true);        // État de chargement
+  const [searchTerm, setSearchTerm] = useState('');    // Terme de recherche
 
   /**
    * Fonction pour charger tous les patients du laboratoire
-   * Utilise useCallback pour éviter les re-rendus inutiles
    */
   const fetchAllPatients = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/patients/labo/${user.laboratoireId}`);
-      setPatients(response.data.patients || []);
+      const data = response.data.patients || [];
+      setPatients(data);
+      setFilteredPatients(data); // Initialiser la liste filtrée
     } catch (err) {
-      // Log technique pour le débogage
       console.error('Erreur détaillée chargement patients:', {
         message: err.message,
         status: err.response?.status,
         data: err.response?.data
       });
-
-      
-      // Message utilisateur
       toast.error('Impossible de charger la liste des patients');
     } finally {
       setLoading(false);
     }
-  }, [user.laboratoireId]); // Dépendance : si l'ID du labo change, on recharge
+  }, [user.laboratoireId]);
 
   /**
-   * Chargement initial des patients au montage du composant
+   * Chargement initial des patients
    */
   useEffect(() => {
     fetchAllPatients();
-  }, [fetchAllPatients]); // Dépendance : la fonction elle-même
+  }, [fetchAllPatients]);
 
-  /**
-   * Recherche de patients par terme
-   * Si le terme est vide, recharge tous les patients
-   */
-  const searchPatients = async () => {
-    // Si le champ de recherche est vide, on recharge tout
-    if (!searchTerm.trim()) {
-      await fetchAllPatients();
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Appel à l'API de recherche
-      const response = await api.get(
-        `/patients/search?q=${encodeURIComponent(searchTerm)}&laboratoireId=${user.laboratoireId}`
-      );
-      
-      setPatients(response.data.patients || []);
-      
-      // Feedback si aucun résultat
-      if (response.data.count === 0) {
-        toast.info('Aucun patient trouvé pour cette recherche');
+  // ===== RECHERCHE INSTANTANÉE =====
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm.length >= 2) {
+        // Filtrer en temps réel
+        const filtered = patients.filter(p => 
+          p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.telephone.includes(searchTerm) ||
+          (p.numeroSecuriteSociale && p.numeroSecuriteSociale.includes(searchTerm))
+        );
+        setFilteredPatients(filtered);
+        
+        // Optionnel : feedback si aucun résultat
+        if (filtered.length === 0) {
+          toast.info('Aucun patient trouvé pour cette recherche', { autoClose: 2000 });
+        }
+      } else {
+        // Moins de 2 caractères → afficher tout
+        setFilteredPatients(patients);
       }
-    } catch (err) {
-      console.error('Erreur recherche:', {
-        message: err.message,
-        searchTerm,
-        status: err.response?.status
-      });
-      
-      toast.error('Erreur lors de la recherche');
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, 300); // Délai de 300ms pour éviter les calculs trop fréquents
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, patients]);
 
   /**
    * Suppression (désactivation) d'un patient
-   * @param {string} id - ID du patient à supprimer
    */
   const handleDelete = async (id) => {
-    // Confirmation utilisateur
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce patient ? Cette action est réversible.')) {
       return;
     }
     
     try {
       await api.delete(`/patients/${id}`);
-      
-      // Feedback succès
       toast.success('Patient supprimé avec succès');
-      
-      // Recharger la liste
-      await fetchAllPatients();
+      await fetchAllPatients(); // Recharger la liste
     } catch (err) {
       console.error('Erreur suppression:', {
         message: err.message,
         patientId: id,
         status: err.response?.status
       });
-      
       toast.error('Erreur lors de la suppression');
-    }
-  };
-
-  /**
-   * Gestionnaire de touche Entrée dans le champ de recherche
-   * @param {Object} e - Événement clavier
-   */
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      searchPatients();
     }
   };
 
@@ -151,18 +120,19 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
- {/* Bouton retour */}
-  <div className="mb-4">
-    <button
-      onClick={() => navigate('/dashboard')}
-      className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-    >
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Retour au tableau de bord
-    </button>
-  </div>
+        {/* Bouton retour */}
+        <div className="mb-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Retour au tableau de bord
+          </button>
+        </div>
+
         {/* ===== EN-TÊTE ===== */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
@@ -170,7 +140,7 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
               Gestion des patients
             </h1>
             <p className="text-gray-600 mt-1">
-              {patients.length} patient(s) enregistré(s)
+              {filteredPatients.length} patient(s) affiché(s) sur {patients.length}
             </p>
           </div>
           
@@ -183,9 +153,9 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
           </button>
         </div>
 
-        {/* ===== BARRE DE RECHERCHE ===== */}
+        {/* ===== BARRE DE RECHERCHE INSTANTANÉE ===== */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col gap-4">
             <div className="flex-1 relative">
               <label htmlFor="search" className="sr-only">
                 Rechercher un patient
@@ -193,12 +163,12 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
               <input
                 id="search"
                 type="text"
-                placeholder="Rechercher par nom, téléphone ou n° sécurité sociale..."
+                placeholder="Recherche instantanée (dès 2 caractères)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyPress={handleKeyPress}
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 disabled={loading}
+                autoFocus
               />
               <img 
                 src={IconSearch} 
@@ -208,25 +178,17 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
               />
             </div>
             
-            <button
-              onClick={searchPatients}
-              disabled={loading}
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
-            >
-              {loading ? 'Recherche...' : 'Rechercher'}
-            </button>
+            {searchTerm.length >= 2 && (
+              <p className="text-sm text-gray-500 mt-2">
+                {filteredPatients.length} résultat(s) pour "{searchTerm}"
+              </p>
+            )}
           </div>
-          
-          {searchTerm && (
-            <p className="text-sm text-gray-500 mt-2">
-              Résultats pour : "{searchTerm}"
-            </p>
-          )}
         </div>
 
         {/* ===== TABLEAU DES PATIENTS ===== */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {patients.length === 0 ? (
+          {filteredPatients.length === 0 ? (
             // Message si aucun patient
             <div className="text-center py-16 px-4">
               <div className="text-gray-400 mb-4">
@@ -235,11 +197,11 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Aucun patient trouvé
+                {searchTerm ? 'Aucun résultat' : 'Aucun patient'}
               </h3>
               <p className="text-gray-500 mb-6">
                 {searchTerm 
-                  ? 'Aucun patient ne correspond à votre recherche.'
+                  ? `Aucun patient ne correspond à "${searchTerm}"`
                   : 'Commencez par ajouter votre premier patient.'}
               </p>
               {!searchTerm && (
@@ -273,7 +235,7 @@ import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {patients.map((patient) => (
+                  {filteredPatients.map((patient) => (
                     <tr 
                       key={patient._id} 
                       className="hover:bg-gray-50 transition-colors"

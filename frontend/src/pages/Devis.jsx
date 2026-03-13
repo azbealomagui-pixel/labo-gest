@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: Devis
 // RÔLE: Liste et gestion des devis/factures
-// AVEC: Gestion complète des statuts et icônes
+// AVEC: Recherche instantanée + confirmation actions
 // ===========================================
 
 import { useEffect, useState } from 'react';
@@ -94,9 +94,11 @@ const formaterMontant = (montant, devise = 'EUR') => {
 const Devis = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [devis, setDevis] = useState([]);
+  const [devis, setDevis] = useState([]);           // Liste complète
+  const [filteredDevis, setFilteredDevis] = useState([]); // Liste filtrée
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('tous');
+  const [filter, setFilter] = useState('tous');      // Filtre par statut
+  const [searchTerm, setSearchTerm] = useState('');   // Terme de recherche
   const [laboratoire, setLaboratoire] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -105,7 +107,9 @@ const Devis = () => {
     const fetchDevis = async () => {
       try {
         const response = await api.get(`/devis/labo/${user.laboratoireId}`);
-        setDevis(response.data.devis || []);
+        const data = response.data.devis || [];
+        setDevis(data);
+        setFilteredDevis(data);
       } catch (err) {
         console.error('❌ Erreur chargement devis:', err);
         toast.error('Erreur chargement des devis');
@@ -133,8 +137,48 @@ const Devis = () => {
     }
   }, [user?.laboratoireId]);
 
-  // ===== CHANGEMENT DE STATUT =====
-  const updateStatut = async (id, nouveauStatut) => {
+  // ===== RECHERCHE INSTANTANÉE =====
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Appliquer d'abord le filtre par statut
+      let filtered = devis;
+      
+      if (filter !== 'tous') {
+        filtered = filtered.filter(d => d.statut === filter);
+      }
+      
+      // Ensuite appliquer la recherche textuelle
+      if (searchTerm.length >= 2) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(d => 
+          d.numero.toLowerCase().includes(term) ||
+          `${d.patientId?.nom} ${d.patientId?.prenom}`.toLowerCase().includes(term) ||
+          (d.total?.valeur && d.total.valeur.toString().includes(term))
+        );
+        setFilteredDevis(filtered);
+      } else {
+        setFilteredDevis(filtered);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, filter, devis]);
+
+  // ===== CHANGEMENT DE STATUT AVEC CONFIRMATION =====
+  const updateStatut = async (id, nouveauStatut, action) => {
+    // Messages de confirmation personnalisés
+    const confirmMessages = {
+      envoyer: 'Voulez-vous envoyer ce devis au patient ?',
+      accepter: 'Voulez-vous accepter ce devis ?',
+      refuser: 'Voulez-vous refuser ce devis ?',
+      payer: 'Voulez-vous marquer ce devis comme payé ?',
+      annuler: 'Voulez-vous vraiment annuler ce devis ?'
+    };
+
+    if (!window.confirm(confirmMessages[action])) {
+      return; // Annulation de l'action
+    }
+
     setActionLoading(id);
     try {
       const response = await api.patch(`/devis/${id}/statut`, { 
@@ -143,9 +187,25 @@ const Devis = () => {
       });
       
       if (response.data.success) {
-        setDevis(devis.map(d => 
+        // Mettre à jour les deux listes
+        const updatedDevis = devis.map(d => 
           d._id === id ? { ...d, statut: nouveauStatut } : d
-        ));
+        );
+        setDevis(updatedDevis);
+        
+        // Re-filtrer après mise à jour
+        let filtered = updatedDevis;
+        if (filter !== 'tous') {
+          filtered = filtered.filter(d => d.statut === filter);
+        }
+        if (searchTerm.length >= 2) {
+          const term = searchTerm.toLowerCase();
+          filtered = filtered.filter(d => 
+            d.numero.toLowerCase().includes(term) ||
+            `${d.patientId?.nom} ${d.patientId?.prenom}`.toLowerCase().includes(term)
+          );
+        }
+        setFilteredDevis(filtered);
         
         const messages = {
           envoye: '📤 Devis envoyé au patient',
@@ -187,7 +247,7 @@ const Devis = () => {
       <div className="flex gap-1 ml-2">
         {config.actions.includes('envoyer') && (
           <button
-            onClick={() => updateStatut(devisItem._id, 'envoye')}
+            onClick={() => updateStatut(devisItem._id, 'envoye', 'envoyer')}
             disabled={actionLoading === devisItem._id}
             className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 transition-colors"
             title="Envoyer au patient"
@@ -198,7 +258,7 @@ const Devis = () => {
         
         {config.actions.includes('accepter') && (
           <button
-            onClick={() => updateStatut(devisItem._id, 'accepte')}
+            onClick={() => updateStatut(devisItem._id, 'accepte', 'accepter')}
             disabled={actionLoading === devisItem._id}
             className="p-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 transition-colors"
             title="Accepter le devis"
@@ -209,7 +269,7 @@ const Devis = () => {
         
         {config.actions.includes('refuser') && (
           <button
-            onClick={() => updateStatut(devisItem._id, 'refuse')}
+            onClick={() => updateStatut(devisItem._id, 'refuse', 'refuser')}
             disabled={actionLoading === devisItem._id}
             className="p-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50 transition-colors"
             title="Refuser le devis"
@@ -220,7 +280,7 @@ const Devis = () => {
         
         {config.actions.includes('payer') && (
           <button
-            onClick={() => updateStatut(devisItem._id, 'paye')}
+            onClick={() => updateStatut(devisItem._id, 'paye', 'payer')}
             disabled={actionLoading === devisItem._id}
             className="p-1 bg-teal-100 text-teal-700 rounded hover:bg-teal-200 disabled:opacity-50 transition-colors"
             title="Marquer comme payé"
@@ -231,11 +291,7 @@ const Devis = () => {
         
         {config.actions.includes('annuler') && (
           <button
-            onClick={() => {
-              if (window.confirm('Voulez-vous vraiment annuler ce devis ?')) {
-                updateStatut(devisItem._id, 'annule');
-              }
-            }}
+            onClick={() => updateStatut(devisItem._id, 'annule', 'annuler')}
             disabled={actionLoading === devisItem._id}
             className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50 transition-colors"
             title="Annuler le devis"
@@ -274,7 +330,7 @@ const Devis = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Devis & Factures</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Gérez le cycle de vie de vos devis
+              {filteredDevis.length} devis affiché(s) sur {devis.length}
             </p>
           </div>
           <button
@@ -286,9 +342,10 @@ const Devis = () => {
           </button>
         </div>
 
-        {/* Filtres */}
+        {/* Filtres et recherche */}
         <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-          <div className="flex gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Filtre par statut */}
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -299,97 +356,130 @@ const Devis = () => {
                 <option key={key} value={key}>{config.label}</option>
               ))}
             </select>
+
+            {/* Barre de recherche instantanée */}
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Recherche instantanée (n° devis, patient, montant)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+              />
+              <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5 text-gray-400" />
+            </div>
           </div>
+          {searchTerm.length >= 2 && (
+            <p className="text-sm text-gray-500 mt-2">
+              {filteredDevis.length} résultat(s) pour "{searchTerm}"
+            </p>
+          )}
         </div>
 
         {/* Liste des devis */}
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  N° Devis
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Patient
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Montant
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {devis
-                .filter(d => filter === 'tous' || d.statut === filter)
-                .map((d) => (
-                <tr key={d._id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-mono text-sm">{d.numero}</td>
-                  <td className="px-6 py-4">
-                    {d.patientId?.nom} {d.patientId?.prenom}
-                  </td>
-                  <td className="px-6 py-4">
-                    {formatDate(d.dateEmission)}
-                  </td>
-                  <td className="px-6 py-4 font-medium">
-                    {formaterMontant(d.total?.valeur || 0, d.devise || 'EUR')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <StatusBadge statut={d.statut} />
-                      <StatusActions devisItem={d} />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      {/* Bouton Voir/Modifier */}
-                      <button
-                        onClick={() => navigate(`/devis/${d._id}`)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Voir le devis"
-                      >
-                        <img src={IconEdit} alt="Voir" className="w-5 h-5" />
-                      </button>
-                      
-                      {/* Bouton Ouvrir le PDF */}
-                      <button
-                        onClick={async () => {
-                          const doc = await genererPDFDevis(d, laboratoire, user);
-                          if (doc) ouvrirPDF(doc);
-                        }}
-                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                        title="Ouvrir le PDF"
-                      >
-                        <img src={IconPrinter} alt="PDF" className="w-5 h-5" />
-                      </button>
-                      
-                      {/* Bouton Télécharger le PDF */}
-                      <button
-                        onClick={async () => {
-                          const doc = await genererPDFDevis(d, laboratoire, user);
-                          if (doc) telechargerPDF(doc, `devis-${d.numero}.pdf`);
-                        }}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Télécharger le PDF"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
+          {filteredDevis.length === 0 ? (
+            <div className="text-center py-16 px-4">
+              <div className="text-gray-400 mb-4">
+                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {searchTerm ? 'Aucun résultat' : 'Aucun devis'}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {searchTerm 
+                  ? `Aucun devis ne correspond à "${searchTerm}"`
+                  : 'Commencez par créer votre premier devis.'}
+              </p>
+            </div>
+          ) : (
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    N° Devis
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Patient
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Montant
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statut
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredDevis.map((d) => (
+                  <tr key={d._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-mono text-sm">{d.numero}</td>
+                    <td className="px-6 py-4">
+                      {d.patientId?.nom} {d.patientId?.prenom}
+                    </td>
+                    <td className="px-6 py-4">
+                      {formatDate(d.dateEmission)}
+                    </td>
+                    <td className="px-6 py-4 font-medium">
+                      {formaterMontant(d.total?.valeur || 0, d.devise || 'EUR')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <StatusBadge statut={d.statut} />
+                        <StatusActions devisItem={d} />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        {/* Bouton Voir/Modifier */}
+                        <button
+                          onClick={() => navigate(`/devis/${d._id}`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Voir le devis"
+                        >
+                          <img src={IconEdit} alt="Voir" className="w-5 h-5" />
+                        </button>
+                        
+                        {/* Bouton Ouvrir le PDF */}
+                        <button
+                          onClick={async () => {
+                            const doc = await genererPDFDevis(d, laboratoire, user);
+                            if (doc) ouvrirPDF(doc);
+                          }}
+                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Ouvrir le PDF"
+                        >
+                          <img src={IconPrinter} alt="PDF" className="w-5 h-5" />
+                        </button>
+                        
+                        {/* Bouton Télécharger le PDF */}
+                        <button
+                          onClick={async () => {
+                            const doc = await genererPDFDevis(d, laboratoire, user);
+                            if (doc) telechargerPDF(doc, `devis-${d.numero}.pdf`);
+                          }}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Télécharger le PDF"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

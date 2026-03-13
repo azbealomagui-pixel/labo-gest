@@ -1,7 +1,8 @@
 // ===========================================
 // UTILITAIRE: pdfGenerator.js
-// RÔLE: Générer des PDF professionnels pour devis
-// AVEC: Code QR, multi-devise, infos complètes
+// RÔLE: Générer des PDF professionnels
+// POUR: Devis, Patients, Analyses
+// AVEC: Logo, QR code, multi-devise
 // ===========================================
 
 import jsPDF from 'jspdf';
@@ -20,7 +21,7 @@ export const ouvrirPDF = (doc) => {
     window.open(pdfUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
   } catch (error) {
-    console.error('Erreur ouverture PDF:', error);
+    console.error('❌ Erreur ouverture PDF:', error);
     alert('Impossible d\'ouvrir le PDF');
   }
 };
@@ -32,13 +33,36 @@ export const telechargerPDF = (doc, nomFichier = 'document.pdf') => {
   try {
     doc.save(nomFichier);
   } catch (error) {
-    console.error('Erreur téléchargement PDF:', error);
+    console.error('❌ Erreur téléchargement PDF:', error);
     alert('Impossible de télécharger le PDF');
+  }
+};
+
+// ===== FONCTIONS PRIVÉES =====
+
+/**
+ * Ajoute le logo au PDF
+ * @param {Object} doc - Instance jsPDF
+ */
+const ajouterLogo = async (doc) => {
+  try {
+    // Essayer de charger le logo (si le fichier existe)
+    const logoUrl = '/src/assets/images/logos/logo-lab.png';
+    doc.addImage(logoUrl, 'PNG', 14, 10, 30, 15);
+  } catch (err) {
+    // Silencieux - on continue sans logo
+    console.log('Logo non trouvé, génération sans logo');
+    // On utilise err pour satisfaire ESLint (mais sans afficher)
+    console.debug('Détail technique (ignoré):', err.message);
   }
 };
 
 /**
  * Génère un code QR et l'ajoute au PDF
+ * @param {Object} doc - Instance jsPDF
+ * @param {string} texte - Texte à encoder
+ * @param {number} x - Position X
+ * @param {number} y - Position Y
  */
 const ajouterQRCode = async (doc, texte, x, y) => {
   try {
@@ -46,11 +70,13 @@ const ajouterQRCode = async (doc, texte, x, y) => {
       width: 80,
       margin: 1
     });
-    doc.addImage(qrDataUrl, 'PNG', x, y, 40, 40);
+    doc.addImage(qrDataUrl, 'PNG', x, y, 30, 30);
   } catch (error) {
-    console.error('Erreur génération QR code:', error);
+    console.error('❌ Erreur génération QR code:', error);
   }
 };
+
+// ===== PDF DEVIS =====
 
 /**
  * Génère un PDF de devis professionnel
@@ -60,51 +86,54 @@ export const genererPDFDevis = async (devis, laboratoire, utilisateur) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     
-    // ===== EN-TÊTE AVEC LOGO =====
+    // ===== AJOUT DU LOGO =====
+    await ajouterLogo(doc);
+    
+    // ===== EN-TÊTE =====
     doc.setFontSize(24);
     doc.setTextColor(37, 99, 235);
-    doc.text('LABOGEST', 14, 20);
+    doc.text('LABOGEST', 50, 20);
     
     doc.setFontSize(10);
     doc.setTextColor(75, 85, 99);
-    doc.text('Application de gestion de laboratoire', 14, 28);
+    doc.text('Application de gestion de laboratoire', 50, 28);
     
     // ===== INFOS LABORATOIRE =====
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.text('Laboratoire :', 14, 40);
+    doc.text('Laboratoire :', 14, 45);
     doc.setFontSize(10);
     doc.setTextColor(75, 85, 99);
-    doc.text(laboratoire?.nom || 'Non spécifié', 14, 47);
-    doc.text(laboratoire?.adresse || '', 14, 54);
-    doc.text(`Tél: ${laboratoire?.telephone || ''}`, 14, 61);
-    doc.text(`Email: ${laboratoire?.email || ''}`, 14, 68);
+    doc.text(laboratoire?.nom || 'Non spécifié', 14, 52);
+    doc.text(laboratoire?.adresse || '', 14, 59);
+    doc.text(`Tél: ${laboratoire?.telephone || ''}`, 14, 66);
+    doc.text(`Email: ${laboratoire?.email || ''}`, 14, 73);
     
     // ===== NUMÉRO DE DEVIS =====
     doc.setFontSize(16);
     doc.setTextColor(37, 99, 235);
-    doc.text(`DEVIS N° ${devis.numero || 'N/A'}`, pageWidth - 14, 40, { align: 'right' });
+    doc.text(`DEVIS N° ${devis.numero || 'N/A'}`, pageWidth - 14, 45, { align: 'right' });
     
     doc.setFontSize(10);
     doc.setTextColor(75, 85, 99);
-    doc.text(`Date: ${new Date(devis.dateEmission).toLocaleDateString('fr-FR')}`, pageWidth - 14, 50, { align: 'right' });
-    doc.text(`Valable jusqu'au: ${new Date(devis.dateValidite).toLocaleDateString('fr-FR')}`, pageWidth - 14, 58, { align: 'right' });
+    doc.text(`Date: ${new Date(devis.dateEmission).toLocaleDateString('fr-FR')}`, pageWidth - 14, 55, { align: 'right' });
+    doc.text(`Valable jusqu'au: ${new Date(devis.dateValidite).toLocaleDateString('fr-FR')}`, pageWidth - 14, 63, { align: 'right' });
     
     // ===== INFOS PATIENT =====
     doc.setFontSize(12);
     doc.setTextColor(37, 99, 235);
-    doc.text('PATIENT', 14, 85);
+    doc.text('PATIENT', 14, 90);
     
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     const patientNom = devis.patientId?.nom || '';
     const patientPrenom = devis.patientId?.prenom || '';
-    doc.text(`${patientNom} ${patientPrenom}`.trim() || 'Patient non spécifié', 14, 93);
+    doc.text(`${patientNom} ${patientPrenom}`.trim() || 'Patient non spécifié', 14, 98);
     
     doc.setFontSize(10);
     doc.setTextColor(75, 85, 99);
-    doc.text(`Tél: ${devis.patientId?.telephone || 'Non renseigné'}`, 14, 101);
-    doc.text(`Email: ${devis.patientId?.email || 'Non renseigné'}`, 14, 109);
+    doc.text(`Tél: ${devis.patientId?.telephone || 'Non renseigné'}`, 14, 106);
+    doc.text(`Email: ${devis.patientId?.email || 'Non renseigné'}`, 14, 114);
     
     // ===== TABLEAU DES ANALYSES =====
     const tableData = (devis.lignes || []).map(ligne => {
@@ -124,7 +153,7 @@ export const genererPDFDevis = async (devis, laboratoire, utilisateur) => {
     }
     
     autoTable(doc, {
-      startY: 120,
+      startY: 125,
       head: [['Code', 'Analyse', 'Catégorie', 'Qté', 'Prix unitaire', 'Total']],
       body: tableData,
       foot: [[
@@ -159,15 +188,15 @@ export const genererPDFDevis = async (devis, laboratoire, utilisateur) => {
     
     // ===== CODE QR =====
     const qrData = `Devis: ${devis.numero}\nPatient: ${patientNom} ${patientPrenom}\nCréé par: ${utilisateur?.prenom || ''} ${utilisateur?.nom || ''}\nLaboratoire: ${laboratoire?.nom || ''}`;
-    await ajouterQRCode(doc, qrData, 14, finalY + 30);
+    await ajouterQRCode(doc, qrData, 14, finalY + 20);
     
     // ===== NOTES =====
     if (devis.notes) {
       doc.setFontSize(9);
       doc.setTextColor(75, 85, 99);
-      doc.text('Notes:', 60, finalY + 40);
+      doc.text('Notes:', 60, finalY + 30);
       const splitNotes = doc.splitTextToSize(devis.notes, pageWidth - 80);
-      doc.text(splitNotes, 60, finalY + 48);
+      doc.text(splitNotes, 60, finalY + 38);
     }
     
     // ===== PIED DE PAGE =====
@@ -183,7 +212,224 @@ export const genererPDFDevis = async (devis, laboratoire, utilisateur) => {
     return doc;
     
   } catch (error) {
-    console.error('❌ Erreur génération PDF:', error);
+    console.error('❌ Erreur génération PDF devis:', error);
+    alert('Erreur lors de la génération du PDF');
+    return null;
+  }
+};
+
+// ===== PDF PATIENT =====
+
+/**
+ * Génère une fiche patient au format PDF
+ */
+export const genererPDFPatient = async (patient, laboratoire) => {
+  try {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    // ===== AJOUT DU LOGO =====
+    await ajouterLogo(doc);
+    
+    // ===== EN-TÊTE =====
+    doc.setFontSize(24);
+    doc.setTextColor(37, 99, 235);
+    doc.text('LABOGEST', 50, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text('Fiche patient', 50, 28);
+    
+    // ===== INFOS LABORATOIRE =====
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(laboratoire?.nom || 'Laboratoire', 14, 45);
+    
+    // ===== TITRE =====
+    doc.setFontSize(16);
+    doc.setTextColor(37, 99, 235);
+    doc.text('FICHE PATIENT', 14, 60);
+    
+    // ===== INFOS PATIENT =====
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    
+    let yPos = 75;
+    
+    doc.text(`Nom complet : ${patient.nom} ${patient.prenom}`, 14, yPos); yPos += 8;
+    doc.text(`Date naissance : ${new Date(patient.dateNaissance).toLocaleDateString('fr-FR')}`, 14, yPos); yPos += 8;
+    doc.text(`Sexe : ${patient.sexe === 'M' ? 'Masculin' : patient.sexe === 'F' ? 'Féminin' : patient.sexe}`, 14, yPos); yPos += 8;
+    doc.text(`Téléphone : ${patient.telephone}`, 14, yPos); yPos += 8;
+    
+    if (patient.email) {
+      doc.text(`Email : ${patient.email}`, 14, yPos); yPos += 8;
+    }
+    
+    doc.text(`Adresse : ${patient.adresse}`, 14, yPos); yPos += 8;
+    
+    if (patient.numeroSecuriteSociale) {
+      doc.text(`N° Sécurité sociale : ${patient.numeroSecuriteSociale}`, 14, yPos); yPos += 8;
+    }
+    
+    if (patient.groupeSanguin && patient.groupeSanguin !== 'Inconnu') {
+      doc.text(`Groupe sanguin : ${patient.groupeSanguin}`, 14, yPos); yPos += 8;
+    }
+    
+    if (patient.allergies && patient.allergies.length > 0) {
+      doc.text(`Allergies : ${patient.allergies.join(', ')}`, 14, yPos); yPos += 8;
+    }
+    
+    if (patient.observations) {
+      doc.setFontSize(10);
+      doc.setTextColor(75, 85, 99);
+      doc.text('Observations :', 14, yPos); yPos += 6;
+      doc.setFontSize(9);
+      const splitObs = doc.splitTextToSize(patient.observations, pageWidth - 30);
+      doc.text(splitObs, 14, yPos);
+    }
+    
+    // ===== CODE QR =====
+    const qrData = `Patient: ${patient.nom} ${patient.prenom}\nNé(e): ${new Date(patient.dateNaissance).toLocaleDateString()}\nTél: ${patient.telephone}\nID: ${patient._id}`;
+    await ajouterQRCode(doc, qrData, pageWidth - 50, 140);
+    
+    // ===== PIED DE PAGE =====
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      `Document généré le ${new Date().toLocaleString()}`,
+      pageWidth / 2,
+      280,
+      { align: 'center' }
+    );
+    
+    return doc;
+    
+  } catch (error) {
+    console.error('❌ Erreur génération PDF patient:', error);
+    alert('Erreur lors de la génération du PDF');
+    return null;
+  }
+};
+
+// ===== PDF ANALYSE =====
+
+/**
+ * Génère une fiche d'analyse au format PDF
+ */
+export const genererPDFAnalyse = async (analyse, laboratoire) => {
+  try {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    // ===== AJOUT DU LOGO =====
+    await ajouterLogo(doc);
+    
+    // ===== EN-TÊTE =====
+    doc.setFontSize(24);
+    doc.setTextColor(37, 99, 235);
+    doc.text('LABOGEST', 50, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text('Fiche d\'analyse', 50, 28);
+    
+    // ===== INFOS LABORATOIRE =====
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(laboratoire?.nom || 'Laboratoire', 14, 45);
+    
+    // ===== TITRE =====
+    doc.setFontSize(16);
+    doc.setTextColor(37, 99, 235);
+    doc.text('FICHE ANALYSE', 14, 60);
+    
+    // ===== INFOS ANALYSE =====
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    
+    let yPos = 75;
+    
+    doc.text(`Code : ${analyse.code}`, 14, yPos); yPos += 8;
+    doc.text(`Nom : ${analyse.nom?.fr || analyse.nom}`, 14, yPos); yPos += 8;
+    
+    if (analyse.nom?.en) {
+      doc.text(`Nom (EN) : ${analyse.nom.en}`, 14, yPos); yPos += 6;
+    }
+    
+    doc.text(`Catégorie : ${analyse.categorie}`, 14, yPos); yPos += 8;
+    doc.text(`Prix : ${analyse.prix?.valeur} ${analyse.prix?.devise || 'EUR'}`, 14, yPos); yPos += 8;
+    doc.text(`Type échantillon : ${analyse.typeEchantillon}`, 14, yPos); yPos += 8;
+    doc.text(`Délai : ${analyse.delaiRendu || 24} heures`, 14, yPos); yPos += 8;
+    
+    if (analyse.uniteMesure && analyse.uniteMesure !== '-') {
+      doc.text(`Unité de mesure : ${analyse.uniteMesure}`, 14, yPos); yPos += 8;
+    }
+    
+    // ===== VALEURS DE RÉFÉRENCE =====
+    if (analyse.valeursReference && 
+        (analyse.valeursReference.homme?.min || analyse.valeursReference.femme?.min || analyse.valeursReference.enfant?.min)) {
+      
+      doc.setFontSize(12);
+      doc.setTextColor(37, 99, 235);
+      doc.text('Valeurs de référence :', 14, yPos); yPos += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      
+      if (analyse.valeursReference.homme?.min) {
+        doc.text(`Homme : ${analyse.valeursReference.homme.min} - ${analyse.valeursReference.homme.max || ''} ${analyse.uniteMesure || ''}`, 14, yPos); 
+        yPos += 6;
+        if (analyse.valeursReference.homme.texte) {
+          doc.text(`(${analyse.valeursReference.homme.texte})`, 20, yPos); yPos += 6;
+        }
+      }
+      
+      if (analyse.valeursReference.femme?.min) {
+        doc.text(`Femme : ${analyse.valeursReference.femme.min} - ${analyse.valeursReference.femme.max || ''} ${analyse.uniteMesure || ''}`, 14, yPos); 
+        yPos += 6;
+        if (analyse.valeursReference.femme.texte) {
+          doc.text(`(${analyse.valeursReference.femme.texte})`, 20, yPos); yPos += 6;
+        }
+      }
+      
+      if (analyse.valeursReference.enfant?.min) {
+        doc.text(`Enfant : ${analyse.valeursReference.enfant.min} - ${analyse.valeursReference.enfant.max || ''} ${analyse.uniteMesure || ''}`, 14, yPos); 
+        yPos += 6;
+        if (analyse.valeursReference.enfant.texte) {
+          doc.text(`(${analyse.valeursReference.enfant.texte})`, 20, yPos); yPos += 6;
+        }
+      }
+    }
+    
+    // ===== INSTRUCTIONS =====
+    if (analyse.instructions) {
+      yPos += 5;
+      doc.setFontSize(12);
+      doc.setTextColor(37, 99, 235);
+      doc.text('Instructions :', 14, yPos); yPos += 6;
+      doc.setFontSize(9);
+      doc.setTextColor(75, 85, 99);
+      const splitInstr = doc.splitTextToSize(analyse.instructions, pageWidth - 30);
+      doc.text(splitInstr, 14, yPos);
+    }
+    
+    // ===== CODE QR =====
+    const qrData = `Analyse: ${analyse.code}\nNom: ${analyse.nom?.fr || analyse.nom}\nPrix: ${analyse.prix?.valeur} ${analyse.prix?.devise || 'EUR'}`;
+    await ajouterQRCode(doc, qrData, pageWidth - 50, 140);
+    
+    // ===== PIED DE PAGE =====
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      `Document généré le ${new Date().toLocaleString()}`,
+      pageWidth / 2,
+      280,
+      { align: 'center' }
+    );
+    
+    return doc;
+    
+  } catch (error) {
+    console.error('❌ Erreur génération PDF analyse:', error);
     alert('Erreur lors de la génération du PDF');
     return null;
   }
