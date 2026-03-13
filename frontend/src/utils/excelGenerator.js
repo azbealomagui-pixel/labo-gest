@@ -44,7 +44,7 @@ export const exportToExcel = (data, filename = 'export', headers = null) => {
     XLSX.writeFile(workbook, `${filename}.xlsx`, { compression: true });
 
   } catch (error) {
-    console.error('❌ Erreur export Excel:', error);
+    console.error('Erreur export Excel:', error);
     throw error;
   }
 };
@@ -66,7 +66,7 @@ export const exportMultipleSheets = (sheets, filename = 'export') => {
     XLSX.writeFile(workbook, `${filename}.xlsx`);
 
   } catch (error) {
-    console.error('❌ Erreur export multiple:', error);
+    console.error('Erreur export multiple:', error);
     throw error;
   }
 };

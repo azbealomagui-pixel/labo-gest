@@ -65,7 +65,7 @@ const useAnalyseLookup = () => {
     }, 300);
 
     debouncedSearch(code, laboratoireId);
-  }, []); // ✅ Dépendances vides, fonction stable
+  }, []); // Dépendances vides, fonction stable
 
   return { loading, analyse, error, searchByCode };
 };

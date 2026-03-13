@@ -21,7 +21,7 @@ export const ouvrirPDF = (doc) => {
     window.open(pdfUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
   } catch (error) {
-    console.error('❌ Erreur ouverture PDF:', error);
+    console.error('Erreur ouverture PDF:', error);
     alert('Impossible d\'ouvrir le PDF');
   }
 };
@@ -33,7 +33,7 @@ export const telechargerPDF = (doc, nomFichier = 'document.pdf') => {
   try {
     doc.save(nomFichier);
   } catch (error) {
-    console.error('❌ Erreur téléchargement PDF:', error);
+    console.error('Erreur téléchargement PDF:', error);
     alert('Impossible de télécharger le PDF');
   }
 };
@@ -72,7 +72,7 @@ const ajouterQRCode = async (doc, texte, x, y) => {
     });
     doc.addImage(qrDataUrl, 'PNG', x, y, 30, 30);
   } catch (error) {
-    console.error('❌ Erreur génération QR code:', error);
+    console.error('Erreur génération QR code:', error);
   }
 };
 
@@ -212,7 +212,7 @@ export const genererPDFDevis = async (devis, laboratoire, utilisateur) => {
     return doc;
     
   } catch (error) {
-    console.error('❌ Erreur génération PDF devis:', error);
+    console.error('Erreur génération PDF devis:', error);
     alert('Erreur lors de la génération du PDF');
     return null;
   }
@@ -305,7 +305,7 @@ export const genererPDFPatient = async (patient, laboratoire) => {
     return doc;
     
   } catch (error) {
-    console.error('❌ Erreur génération PDF patient:', error);
+    console.error('Erreur génération PDF patient:', error);
     alert('Erreur lors de la génération du PDF');
     return null;
   }
@@ -429,7 +429,7 @@ export const genererPDFAnalyse = async (analyse, laboratoire) => {
     return doc;
     
   } catch (error) {
-    console.error('❌ Erreur génération PDF analyse:', error);
+    console.error('Erreur génération PDF analyse:', error);
     alert('Erreur lors de la génération du PDF');
     return null;
   }

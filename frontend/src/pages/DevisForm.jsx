@@ -15,10 +15,6 @@ const CURRENCIES = [
   { code: 'USD', symbole: '$', nom: 'Dollar américain' },
   { code: 'GNF', symbole: 'FG', nom: 'Franc guinéen' },
   { code: 'XOF', symbole: 'CFA', nom: 'Franc CFA' },
-  { code: 'GBP', symbole: '£', nom: 'Livre sterling' },
-  { code: 'MAD', symbole: 'DH', nom: 'Dirham marocain' },
-  { code: 'DZD', symbole: 'DA', nom: 'Dinar algérien' },
-  { code: 'TND', symbole: 'DT', nom: 'Dinar tunisien' }
 ];
 
 const DevisForm = () => {
@@ -65,7 +61,7 @@ const DevisForm = () => {
           
           toast.success('Devis chargé avec succès');
         } catch (err) {
-          console.error('❌ Erreur chargement devis:', err);
+          console.error('Erreur chargement devis:', err);
           toast.error('Impossible de charger le devis');
           navigate('/devis');
         } finally {
@@ -83,7 +79,7 @@ const DevisForm = () => {
         const response = await api.get(`/patients/labo/${user.laboratoireId}`);
         setPatients(response.data.patients || []);
       } catch (err) {
-        console.error('❌ Erreur chargement patients:', err);
+        console.error('Erreur chargement patients:', err);
         toast.error('Erreur chargement patients');
       }
     };
@@ -97,7 +93,7 @@ const DevisForm = () => {
         const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
         setAnalyses(response.data.analyses || []);
       } catch (err) {
-        console.error('❌ Erreur chargement analyses:', err);
+        console.error('Erreur chargement analyses:', err);
         toast.error('Erreur chargement analyses');
       }
     };
@@ -184,15 +180,15 @@ const DevisForm = () => {
 
       if (id) {
         await api.put(`/devis/${id}`, devisData);
-        toast.success('✅ Devis modifié avec succès');
+        toast.success('Devis modifié avec succès');
       } else {
         await api.post('/devis', devisData);
-        toast.success('✅ Devis créé avec succès');
+        toast.success('Devis créé avec succès');
       }
       
       navigate('/devis');
     } catch (err) {
-      console.error('❌ Erreur:', err);
+      console.error('Erreur:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);
@@ -230,7 +226,7 @@ const DevisForm = () => {
             </button>
             <span>|</span>
             <button onClick={() => navigate('/dashboard')} className="text-gray-600 hover:text-gray-900">
-              🏠 Dashboard
+              Dashboard
             </button>
           </div>
 

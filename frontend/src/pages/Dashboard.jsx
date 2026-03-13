@@ -242,7 +242,7 @@ const Dashboard = () => {
     </p>
   </button>
   
-  {/* ✅ NOUVEAU BOUTON - Fiche d'analyses patient */}
+  {/*NOUVEAU BOUTON - Fiche d'analyses patient */}
   <button
     onClick={() => navigate('/fiche-analyses/new')}
     className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group border-2 border-primary-100 hover:border-primary-300"

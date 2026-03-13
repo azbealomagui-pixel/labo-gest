@@ -97,7 +97,7 @@ const PatientForm = () => {
         const response = await api.get(`/patients/${id}`);
         setFormData(response.data.patient);
       } catch (err) {
-        console.error('❌ Erreur chargement patient:', err);
+        console.error('Erreur chargement patient:', err);
         toast.error('Impossible de charger les données du patient');
         navigate('/patients');
       } finally {
@@ -175,15 +175,15 @@ const PatientForm = () => {
 
       if (id) {
         await api.put(`/patients/${id}`, dataToSend);
-        toast.success('✅ Patient modifié avec succès');
+        toast.success('Patient modifié avec succès');
       } else {
         await api.post('/patients', dataToSend);
-        toast.success('✅ Patient créé avec succès');
+        toast.success('Patient créé avec succès');
       }
       
       navigate('/patients');
     } catch (err) {
-      console.error('❌ Erreur sauvegarde:', err);
+      console.error('Erreur sauvegarde:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la sauvegarde');
     } finally {
       setLoading(false);

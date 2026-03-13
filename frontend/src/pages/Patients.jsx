@@ -95,7 +95,7 @@ const Patients = () => {
         const response = await api.get(`/laboratoires/${user.laboratoireId}`);
         setLaboratoire(response.data.laboratoire);
       } catch (err) {
-        console.error('❌ Erreur chargement labo:', err);
+        console.error('Erreur chargement labo:', err);
       }
     };
     if (user?.laboratoireId) {
@@ -107,6 +107,7 @@ const Patients = () => {
   /**
    * Suppression (désactivation) d'un patient
    */
+  // ===== SUPPRESSION D'UN PATIENT =====
   const handleDelete = async (id) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce patient ? Cette action est réversible.')) {
       return;
@@ -115,14 +116,26 @@ const Patients = () => {
     try {
       await api.delete(`/patients/${id}`);
       toast.success('Patient supprimé avec succès');
-      await fetchAllPatients(); // Recharger la liste
+      
+      // FORCER LA MISE À JOUR DES LISTES
+      const updatedPatients = patients.filter(p => p._id !== id);
+      setPatients(updatedPatients);
+      
+      // Mettre à jour la liste filtrée
+      if (searchTerm.length >= 2) {
+        const filtered = updatedPatients.filter(p => 
+          p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.telephone.includes(searchTerm)
+        );
+        setFilteredPatients(filtered);
+      } else {
+        setFilteredPatients(updatedPatients);
+      }
+      
     } catch (err) {
-      console.error('Erreur suppression:', {
-        message: err.message,
-        patientId: id,
-        status: err.response?.status
-      });
-      toast.error('Erreur lors de la suppression');
+      console.error('Erreur suppression:', err);
+      toast.error(err.response?.data?.message || 'Erreur lors de la suppression');
     }
   };
 
@@ -196,9 +209,9 @@ const Patients = () => {
                     numeroSecuriteSociale: 'N° Sécurité Sociale',
                     observations: 'Observations'
                   });
-                  toast.success(`✅ ${patientsAExporter.length} patients exportés`);
+                  toast.success(`${patientsAExporter.length} patients exportés`);
                 } catch (err) {
-                  console.error('❌ Erreur Excel:', err);
+                  console.error('Erreur Excel:', err);
                   toast.error('Erreur génération Excel');
                 }
               }}
@@ -275,8 +288,7 @@ const Patients = () => {
               {!searchTerm && (
                 <button
                   onClick={() => navigate('/patients/new')}
-                  className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
-                >
+                  className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors">
                   <img src={IconAdd} alt="" className="w-5 h-5" />
                   Ajouter un patient
                 </button>
@@ -306,8 +318,7 @@ const Patients = () => {
                   {filteredPatients.map((patient) => (
                     <tr 
                       key={patient._id} 
-                      className="hover:bg-gray-50 transition-colors"
-                    >
+                      className="hover:bg-gray-50 transition-colors">
                       {/* Colonne Patient */}
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
@@ -344,8 +355,7 @@ const Patients = () => {
                         <button
                           onClick={() => navigate(`/patients/${patient._id}`)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Modifier le patient"
-                        >
+                          title="Modifier le patient">
                           <img src={IconEdit} alt="Modifier" className="w-5 h-5" />
                         </button>
 
@@ -361,7 +371,7 @@ const Patients = () => {
                                 setTimeout(() => URL.revokeObjectURL(url), 1000);
                               }
                             } catch (err) {
-                              console.error('❌ Erreur PDF:', err);
+                              console.error('Erreur PDF:', err);
                               toast.error('Erreur génération PDF');
                             }
                           }}
@@ -382,13 +392,12 @@ const Patients = () => {
                                 doc.save(`patient-${patient.nom}-${patient.prenom}.pdf`);
                               }
                             } catch (err) {
-                              console.error('❌ Erreur PDF:', err);
+                              console.error('Erreur PDF:', err);
                               toast.error('Erreur téléchargement PDF');
                             }
                           }}
                           className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Télécharger le PDF"
-                        >
+                          title="Télécharger le PDF">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
@@ -398,8 +407,7 @@ const Patients = () => {
                         <button
                           onClick={() => handleDelete(patient._id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Supprimer le patient"
-                        >
+                          title="Supprimer le patient">
                           <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
                         </button>
                       </div>

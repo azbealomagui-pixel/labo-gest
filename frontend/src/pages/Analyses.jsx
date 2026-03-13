@@ -33,7 +33,7 @@ const Analyses = () => {
         setAnalyses(data);
         setFilteredAnalyses(data);
       } catch (err) {
-        console.error('❌ Erreur chargement:', err);
+        console.error('Erreur chargement:', err);
         toast.error('Erreur chargement catalogue');
       } finally {
         setLoading(false);
@@ -50,7 +50,7 @@ const Analyses = () => {
         const response = await api.get(`/laboratoires/${user.laboratoireId}`);
         setLaboratoire(response.data.laboratoire);
       } catch (err) {
-        console.error('❌ Erreur chargement labo:', err);
+        console.error('Erreur chargement labo:', err);
       }
     };
     
@@ -82,7 +82,7 @@ const Analyses = () => {
     if (!window.confirm('Supprimer cette analyse ?')) return;
     try {
       await api.delete(`/analyses/${id}`);
-      toast.success('✅ Analyse supprimée');
+      toast.success('Analyse supprimée');
       
       const updatedAnalyses = analyses.filter(a => a._id !== id);
       setAnalyses(updatedAnalyses);
@@ -91,7 +91,7 @@ const Analyses = () => {
         a.nom?.fr?.toLowerCase().includes(searchTerm.toLowerCase())
       ));
     } catch (err) {
-      console.error('❌ Erreur suppression:', err);
+      console.error('Erreur suppression:', err);
       toast.error('Erreur suppression');
     }
   };
@@ -156,9 +156,9 @@ const Analyses = () => {
                     uniteMesure: 'Unité',
                     delaiRendu: 'Délai (h)'
                   });
-                  toast.success(`✅ ${analysesAExporter.length} analyses exportées`);
+                  toast.success(`${analysesAExporter.length} analyses exportées`);
                 } catch (err) {
-                  console.error('❌ Erreur Excel:', err);
+                  console.error('Erreur Excel:', err);
                   toast.error('Erreur génération Excel');
                 }
               }}
@@ -271,7 +271,7 @@ const Analyses = () => {
                                 setTimeout(() => URL.revokeObjectURL(url), 1000);
                               }
                             } catch (err) {
-                              console.error('❌ Erreur PDF:', err);
+                              console.error('Erreur PDF:', err);
                               toast.error('Erreur génération PDF');
                             }
                           }}
@@ -292,7 +292,7 @@ const Analyses = () => {
                                 doc.save(`analyse-${a.code}.pdf`);
                               }
                             } catch (err) {
-                              console.error('❌ Erreur PDF:', err);
+                              console.error('Erreur PDF:', err);
                               toast.error('Erreur téléchargement PDF');
                             }
                           }}

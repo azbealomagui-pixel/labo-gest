@@ -17,10 +17,6 @@ const CURRENCIES = [
   { code: 'USD', symbole: '$', nom: 'Dollar américain' },
   { code: 'GNF', symbole: 'FG', nom: 'Franc guinéen' },
   { code: 'XOF', symbole: 'CFA', nom: 'Franc CFA' },
-  { code: 'GBP', symbole: '£', nom: 'Livre sterling' },
-  { code: 'MAD', symbole: 'DH', nom: 'Dirham marocain' },
-  { code: 'DZD', symbole: 'DA', nom: 'Dinar algérien' },
-  { code: 'TND', symbole: 'DT', nom: 'Dinar tunisien' }
 ];
 
 const FicheAnalyseForm = () => {
@@ -48,7 +44,7 @@ const FicheAnalyseForm = () => {
         const response = await api.get(`/patients/labo/${user.laboratoireId}`);
         setPatients(response.data.patients || []);
       } catch (err) {
-        console.error('❌ Erreur chargement patients:', err);
+        console.error('Erreur chargement patients:', err);
         toast.error('Erreur chargement patients');
       }
     };
@@ -62,7 +58,7 @@ const FicheAnalyseForm = () => {
         const response = await api.get(`/analyses/labo/${user.laboratoireId}`);
         setAnalyses(response.data.analyses || []);
       } catch (err) {
-        console.error('❌ Erreur chargement analyses:', err);
+        console.error('Erreur chargement analyses:', err);
         toast.error('Erreur chargement catalogue');
       }
     };
@@ -86,7 +82,7 @@ const FicheAnalyseForm = () => {
             prixUnitaire: analyse.prix?.valeur || 0,
             devise: analyse.prix?.devise || 'EUR'
           });
-          toast.success(`✅ Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
+          toast.success(`Analyse trouvée : ${analyse.nom?.fr || analyse.nom}`);
         } else {
           setCurrentAnalyse(null);
         }
@@ -123,7 +119,7 @@ const FicheAnalyseForm = () => {
     setCurrentAnalyse(null);
     setCurrentQuantite(1);
     
-    toast.success('✅ Analyse ajoutée à la liste');
+    toast.success('Analyse ajoutée à la liste');
   };
 
   // ===== SUPPRIMER UNE ANALYSE =====
@@ -191,16 +187,16 @@ const FicheAnalyseForm = () => {
         }))
       };
 
-      console.log('📤 Données envoyées:', JSON.stringify(ficheData, null, 2));
+      console.log('Données envoyées:', JSON.stringify(ficheData, null, 2));
 
       const response = await api.post('/fiches-analyses', ficheData);
       
       if (response.data.success) {
-        toast.success('✅ Fiche d\'analyse créée avec succès');
+        toast.success('Fiche d\'analyse créée avec succès');
         navigate('/patients');
       }
     } catch (err) {
-      console.error('❌ Erreur création:', err);
+      console.error('Erreur création:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la création');
     } finally {
       setLoading(false);

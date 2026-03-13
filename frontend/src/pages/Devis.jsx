@@ -112,7 +112,7 @@ const Devis = () => {
         setDevis(data);
         setFilteredDevis(data);
       } catch (err) {
-        console.error('❌ Erreur chargement devis:', err);
+        console.error('Erreur chargement devis:', err);
         toast.error('Erreur chargement des devis');
       } finally {
         setLoading(false);
@@ -129,7 +129,7 @@ const Devis = () => {
         const response = await api.get(`/laboratoires/${user.laboratoireId}`);
         setLaboratoire(response.data.laboratoire);
       } catch (err) {
-        console.error('❌ Erreur chargement labo:', err);
+        console.error('Erreur chargement labo:', err);
       }
     };
     
@@ -174,9 +174,9 @@ const Devis = () => {
     setActionLoading(id);
     try {
       await api.delete(`/devis/${id}`);
-      toast.success(`✅ Devis ${numero} supprimé`);
+      toast.success(`Devis ${numero} supprimé`);
       
-      // Mettre à jour les listes
+      // FORCER LA MISE À JOUR
       const updatedDevis = devis.filter(d => d._id !== id);
       setDevis(updatedDevis);
       
@@ -195,7 +195,7 @@ const Devis = () => {
       setFilteredDevis(filtered);
       
     } catch (err) {
-      console.error('❌ Erreur suppression:', err);
+      console.error('Erreur suppression:', err);
       toast.error(err.response?.data?.message || 'Erreur lors de la suppression');
     } finally {
       setActionLoading(null);
@@ -229,9 +229,9 @@ const Devis = () => {
         dateValidite: 'Date validité'
       });
       
-      toast.success(`✅ ${devisAExporter.length} devis exportés`);
+      toast.success(`${devisAExporter.length} devis exportés`);
     } catch (err) {
-      console.error('❌ Erreur export Excel:', err);
+      console.error('Erreur export Excel:', err);
       toast.error('Erreur lors de l\'export Excel');
     }
   };
@@ -277,16 +277,16 @@ const Devis = () => {
         setFilteredDevis(filtered);
         
         const messages = {
-          envoye: '📤 Devis envoyé',
-          accepte: '✅ Devis accepté',
-          refuse: '❌ Devis refusé',
-          paye: '💰 Devis payé',
-          annule: '🚫 Devis annulé'
+          envoye: 'Devis envoyé',
+          accepte: 'Devis accepté',
+          refuse: 'Devis refusé',
+          paye: 'Devis payé',
+          annule: 'Devis annulé'
         };
         toast.success(messages[nouveauStatut]);
       }
     } catch (err) {
-      console.error('❌ Erreur:', err);
+      console.error('Erreur:', err);
       toast.error(err.response?.data?.message || 'Erreur');
     } finally {
       setActionLoading(null);

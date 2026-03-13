@@ -53,10 +53,10 @@ const AnalyseForm = () => {
       const loadAnalyse = async () => {
         try {
           setLoading(true);
-          console.log('🔄 Chargement analyse ID:', id);
+          console.log('Chargement analyse ID:', id);
           
           const response = await api.get(`/analyses/${id}`);
-          console.log('✅ Réponse API:', response.data);
+          console.log('Réponse API:', response.data);
 
           if (response.data.success) {
             const analyseData = response.data.analyse;
@@ -107,7 +107,7 @@ const AnalyseForm = () => {
             navigate('/analyses');
           }
         } catch (err) {
-          console.error('❌ Erreur chargement:', err);
+          console.error('Erreur chargement:', err);
           toast.error('Impossible de charger l\'analyse');
           navigate('/analyses');
         } finally {
@@ -247,18 +247,18 @@ const AnalyseForm = () => {
     setLoading(true);
     try {
       const dataToSend = nettoyerDonnees();
-      console.log('📤 Envoi:', dataToSend);
+      console.log('Envoi:', dataToSend);
 
       if (id) {
         await api.put(`/analyses/${id}`, dataToSend);
-        toast.success('✅ Analyse modifiée avec succès');
+        toast.success('Analyse modifiée avec succès');
       } else {
         await api.post('/analyses', dataToSend);
-        toast.success('✅ Analyse créée avec succès');
+        toast.success('Analyse créée avec succès');
       }
       navigate('/analyses');
     } catch (err) {
-      console.error('❌ Erreur:', err);
+      console.error('Erreur:', err);
       if (err.response?.status === 409) {
         toast.error('Ce code existe déjà');
       } else {
@@ -290,7 +290,7 @@ const AnalyseForm = () => {
             </button>
             <span>|</span>
             <button onClick={() => navigate('/dashboard')} className="text-gray-600 hover:text-gray-900">
-              🏠 Dashboard
+              Dashboard
             </button>
           </div>
 
