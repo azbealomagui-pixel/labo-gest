@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: DevisForm
 // RÔLE: Création d'un devis (patient + analyses)
-// AVEC: Validation en temps réel, multi-devise
+// VERSION: Sans variable inutilisée
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +11,6 @@ import api from '../services/api';
 import useAuth from '../hooks/useAuth';
 import { IconAdd, IconDelete, IconSearch } from '../assets';
 
-// ===== LISTE DES DEVISES DISPONIBLES =====
 const CURRENCIES = [
   { code: 'EUR', symbole: '€', nom: 'Euro' },
   { code: 'USD', symbole: '$', nom: 'Dollar américain' },
@@ -37,7 +36,7 @@ const DevisForm = () => {
   const [selectedDevise, setSelectedDevise] = useState('EUR');
   const [errors, setErrors] = useState({});
 
-  // ===== CHARGEMENT DES PATIENTS =====
+  // Charger les patients
   useEffect(() => {
     const fetchPatients = async () => {
       try {
@@ -51,7 +50,7 @@ const DevisForm = () => {
     fetchPatients();
   }, [user.laboratoireId]);
 
-  // ===== CHARGEMENT DES ANALYSES =====
+  // Charger les analyses
   useEffect(() => {
     const fetchAnalyses = async () => {
       try {
@@ -65,7 +64,7 @@ const DevisForm = () => {
     fetchAnalyses();
   }, [user.laboratoireId]);
 
-  // ===== VALIDATION DU FORMULAIRE =====
+  // ===== VALIDATION =====
   const validateForm = () => {
     const newErrors = {};
 
@@ -102,25 +101,17 @@ const DevisForm = () => {
       }]);
       toast.success(`${analyse.code} ajouté au devis`);
     }
-    
-    // Effacer l'erreur si présente
-    if (errors.analyses) {
-      setErrors(prev => ({ ...prev, analyses: undefined }));
-    }
   };
 
   // ===== RETIRER UNE ANALYSE =====
   const removeAnalyse = (id) => {
-    const analyse = selectedAnalyses.find(a => a._id === id);
     setSelectedAnalyses(selectedAnalyses.filter(a => a._id !== id));
-    toast.info(`${analyse.code} retiré du devis`);
   };
 
   // ===== METTRE À JOUR LA QUANTITÉ =====
   const updateQuantite = (id, quantite) => {
     const newQuantite = parseInt(quantite) || 1;
     if (newQuantite < 1) return;
-    
     setSelectedAnalyses(selectedAnalyses.map(a =>
       a._id === id ? { ...a, quantite: newQuantite } : a
     ));
@@ -136,23 +127,11 @@ const DevisForm = () => {
     return total.toFixed(2);
   };
 
-  // ===== LIBELLÉ D'UNE DEVISE =====
+  // ===== LIBELLÉ DEVISE =====
   const getDeviseLabel = (code) => {
     const devise = CURRENCIES.find(c => c.code === code);
     return devise ? `${devise.nom} (${devise.symbole})` : code;
   };
-
-  // ===== RECHERCHE FILTRÉE DES PATIENTS =====
-  const filteredPatients = patients.filter(p => 
-    p.nom.toLowerCase().includes(searchPatient.toLowerCase()) ||
-    p.prenom.toLowerCase().includes(searchPatient.toLowerCase())
-  );
-
-  // ===== RECHERCHE FILTRÉE DES ANALYSES =====
-  const filteredAnalyses = analyses.filter(a => 
-    a.code.toLowerCase().includes(searchAnalyse.toLowerCase()) ||
-    a.nom?.fr?.toLowerCase().includes(searchAnalyse.toLowerCase())
-  );
 
   // ===== SOUMISSION =====
   const handleSubmit = async (e) => {
@@ -184,8 +163,6 @@ const DevisForm = () => {
         notes: `Devis créé par ${user.prenom} ${user.nom}`
       };
 
-      console.log('📤 Données envoyées:', devisData);
-
       const response = await api.post('/devis', devisData);
       
       if (response.data.success) {
@@ -200,37 +177,36 @@ const DevisForm = () => {
     }
   };
 
+  // ===== RECHERCHE FILTRÉE =====
+  const filteredPatients = patients.filter(p => 
+    p.nom.toLowerCase().includes(searchPatient.toLowerCase()) ||
+    p.prenom.toLowerCase().includes(searchPatient.toLowerCase())
+  );
+
+  const filteredAnalyses = analyses.filter(a => 
+    a.code.toLowerCase().includes(searchAnalyse.toLowerCase()) ||
+    a.nom?.fr?.toLowerCase().includes(searchAnalyse.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg p-8">
           
-          {/* ===== NAVIGATION ===== */}
+          {/* Navigation */}
           <div className="mb-6 flex items-center gap-4 border-b pb-4">
-            <button 
-              onClick={() => navigate('/devis')} 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Retour liste
+            <button onClick={() => navigate('/devis')} className="text-gray-600 hover:text-gray-900">
+              ← Retour liste
             </button>
-            <span className="text-gray-300">|</span>
-            <button 
-              onClick={() => navigate('/dashboard')} 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              Dashboard
+            <span>|</span>
+            <button onClick={() => navigate('/dashboard')} className="text-gray-600 hover:text-gray-900">
+              🏠 Dashboard
             </button>
           </div>
 
           <h1 className="text-2xl font-bold mb-6">Nouveau devis</h1>
 
-          {/* ===== MESSAGES D'ERREUR ===== */}
+          {/* Messages d'erreur */}
           {Object.keys(errors).length > 0 && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-600 font-medium">
@@ -246,7 +222,7 @@ const DevisForm = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
-            {/* ===== COLONNE GAUCHE : SÉLECTION PATIENT ===== */}
+            {/* Colonne patient */}
             <div>
               <h2 className="text-lg font-semibold mb-4">1. Sélectionner un patient</h2>
               
@@ -256,194 +232,140 @@ const DevisForm = () => {
                   placeholder="Rechercher un patient..."
                   value={searchPatient}
                   onChange={(e) => setSearchPatient(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg"
                 />
-                <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5 opacity-50" />
+                <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5" />
               </div>
 
               <div className="border rounded-lg max-h-60 overflow-y-auto">
-                {filteredPatients.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    Aucun patient trouvé
+                {filteredPatients.map(p => (
+                  <div
+                    key={p._id}
+                    onClick={() => setSelectedPatient(p)}
+                    className={`p-3 cursor-pointer hover:bg-gray-50 border-b ${
+                      selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
+                    }`}
+                  >
+                    <div className="font-medium">{p.nom} {p.prenom}</div>
+                    <div className="text-sm text-gray-600">{p.telephone}</div>
                   </div>
-                ) : (
-                  filteredPatients.map(p => (
-                    <div
-                      key={p._id}
-                      onClick={() => {
-                        setSelectedPatient(p);
-                        setErrors(prev => ({ ...prev, patient: undefined }));
-                      }}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 transition-colors ${
-                        selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
-                      }`}
-                    >
-                      <div className="font-medium">{p.nom} {p.prenom}</div>
-                      <div className="text-sm text-gray-600">{p.telephone}</div>
-                    </div>
-                  ))
-                )}
+                ))}
               </div>
 
               {selectedPatient && (
-                <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <span className="font-medium">Patient sélectionné :</span>{' '}
-                  {selectedPatient.nom} {selectedPatient.prenom}
+                <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                  Patient sélectionné : {selectedPatient.nom} {selectedPatient.prenom}
                 </div>
               )}
             </div>
 
-            {/* ===== COLONNE DROITE : SÉLECTION ANALYSES ===== */}
+            {/* Colonne analyses */}
             <div>
               <h2 className="text-lg font-semibold mb-4">2. Ajouter des analyses</h2>
               
               <div className="relative mb-4">
                 <input
                   type="text"
-                  placeholder="Rechercher une analyse par code ou nom..."
+                  placeholder="Rechercher une analyse..."
                   value={searchAnalyse}
                   onChange={(e) => setSearchAnalyse(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg"
                 />
-                <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5 opacity-50" />
+                <img src={IconSearch} alt="" className="w-5 h-5 absolute left-3 top-2.5" />
               </div>
 
               <div className="border rounded-lg max-h-60 overflow-y-auto mb-4">
-                {filteredAnalyses.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    Aucune analyse trouvée
-                  </div>
-                ) : (
-                  filteredAnalyses.map(a => (
-                    <div
-                      key={a._id}
-                      onClick={() => addAnalyse(a)}
-                      className="p-3 cursor-pointer hover:bg-gray-50 border-b last:border-b-0 flex justify-between items-center transition-colors"
-                    >
-                      <div>
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded mr-2">{a.code}</span>
-                        <span className="text-gray-700">{a.nom?.fr || a.nom}</span>
-                      </div>
-                      <div className="text-primary-600 font-medium">
-                        {a.prix?.valeur || 0} {a.prix?.devise || selectedDevise}
-                      </div>
+                {filteredAnalyses.map(a => (
+                  <div
+                    key={a._id}
+                    onClick={() => addAnalyse(a)}
+                    className="p-3 cursor-pointer hover:bg-gray-50 border-b flex justify-between items-center"
+                  >
+                    <div>
+                      <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded mr-2">{a.code}</span>
+                      {a.nom?.fr || a.nom}
                     </div>
-                  ))
-                )}
+                    <div className="text-primary-600 font-medium">
+                      {a.prix?.valeur || 0} {a.prix?.devise || selectedDevise}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* ===== PANIER DES ANALYSES ===== */}
+              {/* Panier */}
               {selectedAnalyses.length > 0 && (
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <h3 className="font-medium mb-3 flex items-center gap-2">
-                    <span>Analyses sélectionnées</span>
-                    <span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full text-xs">
-                      {selectedAnalyses.length}
-                    </span>
-                  </h3>
-                  
+                <div className="border rounded-lg p-4">
                   {selectedAnalyses.map(a => (
-                    <div key={a._id} className="flex items-center justify-between py-2 border-b last:border-b-0 bg-white px-3 rounded mb-1">
+                    <div key={a._id} className="flex items-center justify-between py-2 border-b">
                       <div className="flex-1">
                         <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded mr-2">{a.code}</span>
-                        <span className="text-sm">{a.nom?.fr || a.nom}</span>
+                        {a.nom?.fr || a.nom}
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <input
                           type="number"
                           min="1"
                           value={a.quantite}
                           onChange={(e) => updateQuantite(a._id, e.target.value)}
-                          className="w-16 px-2 py-1 border rounded text-center text-sm"
-                          title="Quantité"
+                          className="w-16 px-2 py-1 border rounded text-center"
                         />
-                        <span className="w-20 text-right font-medium text-sm">
+                        <span className="w-20 text-right font-medium">
                           {(a.prix?.valeur * a.quantite).toFixed(2)} {selectedDevise}
                         </span>
-                        <button
-                          onClick={() => removeAnalyse(a._id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Retirer"
-                        >
+                        <button onClick={() => removeAnalyse(a._id)} className="p-1 text-red-600">
                           <img src={IconDelete} alt="" className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
                   ))}
 
-                  {/* ===== REMISE GLOBALE ===== */}
+                  {/* Remise */}
                   <div className="mt-4 flex items-center justify-end gap-4">
-                    <label htmlFor="remise" className="text-sm font-medium">
-                      Remise globale (%)
-                    </label>
+                    <label className="text-sm">Remise (%)</label>
                     <input
-                      id="remise"
                       type="number"
-                      min="0"
-                      max="100"
-                      step="1"
                       value={remise}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setRemise(val);
-                        if (val < 0 || val > 100) {
-                          setErrors(prev => ({ ...prev, remise: 'La remise doit être entre 0 et 100%' }));
-                        } else {
-                          setErrors(prev => ({ ...prev, remise: undefined }));
-                        }
-                      }}
-                      className="w-20 px-2 py-1 border rounded text-right focus:ring-2 focus:ring-primary-500"
+                      onChange={(e) => setRemise(parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 border rounded text-right"
                     />
                   </div>
 
-                  {/* ===== TOTAL GÉNÉRAL ===== */}
-                  <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                    <span className="text-lg font-semibold">TOTAL GÉNÉRAL</span>
-                    <span className="text-2xl font-bold text-primary-600">
-                      {calculTotal()} {selectedDevise}
-                    </span>
+                  {/* Total */}
+                  <div className="mt-4 pt-4 border-t flex justify-between items-center text-lg font-bold">
+                    <span>TOTAL</span>
+                    <span className="text-primary-600">{calculTotal()} {selectedDevise}</span>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ===== SÉLECTION DE LA DEVISE ===== */}
+          {/* Devise */}
           <div className="mt-6 pt-4 border-t">
-            <label htmlFor="devise" className="block text-sm font-medium mb-2">
-              Devise du devis
-            </label>
+            <label className="block text-sm font-medium mb-2">Devise</label>
             <select
-              id="devise"
               value={selectedDevise}
               onChange={(e) => setSelectedDevise(e.target.value)}
-              className="w-full md:w-64 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+              className="w-full md:w-64 px-4 py-2 border rounded-lg"
             >
-              {CURRENCIES.map(devise => (
-                <option key={devise.code} value={devise.code}>
-                  {getDeviseLabel(devise.code)}
-                </option>
+              {CURRENCIES.map(d => (
+                <option key={d.code} value={d.code}>{getDeviseLabel(d.code)}</option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Le montant total sera affiché dans cette devise
-            </p>
           </div>
 
-          {/* ===== BOUTONS ===== */}
+          {/* Boutons */}
           <div className="mt-8 flex gap-4">
             <button
               onClick={handleSubmit}
-              disabled={loading || !selectedPatient || selectedAnalyses.length === 0}
-              className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              disabled={loading}
+              className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50"
             >
-              {loading ? 'Création en cours...' : 'Créer le devis'}
+              {loading ? 'Création...' : 'Créer le devis'}
             </button>
             <button
-              type="button"
               onClick={() => navigate('/devis')}
-              disabled={loading}
-              className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 font-medium"
+              className="flex-1 bg-gray-200 px-6 py-3 rounded-lg hover:bg-gray-300"
             >
               Annuler
             </button>
