@@ -19,8 +19,13 @@ import Devis from './pages/Devis';
 import DevisForm from './pages/DevisForm';
 import FicheAnalyseForm from './pages/FicheAnalyseForm';
 import CreerEspace from './pages/CreerEspace';
+import Register from './pages/Register';
 
 
+
+
+// Dans les routes publiques (avant les routes protégées)
+<Route path="/register" element={<Register />} />
 
 /**
  * Composant pour les routes protégées

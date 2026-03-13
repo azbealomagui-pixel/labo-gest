@@ -10,6 +10,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 // 2. CHARGER LES VARIABLES D'ENVIRONNEMENT
 // ----------------------------------------
@@ -18,6 +19,37 @@ dotenv.config();
 // 3. CRÉER L'APPLICATION EXPRESS
 // -----------------------------
 const app = express();
+
+
+// ===== CONFIGURATION DU RATE LIMITING =====
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limite chaque IP à 100 requêtes par fenêtre
+  message: {
+    success: false,
+    message: 'Trop de requêtes, veuillez réessayer plus tard'
+  },
+  standardHeaders: true, // Retourne les headers RateLimit
+  legacyHeaders: false, // Désactive les anciens headers
+});
+
+// Appliquer à toutes les routes
+app.use(limiter);
+
+// ===== LIMITE PLUS STRICTE POUR LES ROUTES SENSIBLES =====
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 5, // 5 tentatives max par heure
+  message: {
+    success: false,
+    message: 'Trop de tentatives, compte temporairement bloqué'
+  }
+});
+
+// Appliquer aux routes de login/register
+app.use('/api/users/login', authLimiter);
+app.use('/api/users/register', authLimiter);
+
 
 // 4. DÉFINIR LE PORT
 // -----------------

@@ -79,6 +79,61 @@ router.get('/', async (req, res) => {
 
 
 // ===========================================
+// INSCRIPTION D'UN NOUVEL UTILISATEUR
+// ===========================================
+router.post('/register', async (req, res) => {
+  try {
+    const { nom, prenom, email, password, role } = req.body;
+
+    // Validation
+    if (!nom || !prenom || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tous les champs sont obligatoires'
+      });
+    }
+
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cet email est déjà utilisé'
+      });
+    }
+
+    // Créer l'utilisateur
+    const newUser = new User({
+      nom,
+      prenom,
+      email,
+      password,
+      role: role || 'manager_labo'
+    });
+
+    await newUser.save();
+
+    // Réponse sans mot de passe
+    const userResponse = newUser.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      success: true,
+      message: 'Compte créé avec succès',
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error('Erreur inscription:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+
+// ===========================================
 // NOUVELLE ROUTE : LOGIN
 // ===========================================
 router.post('/login', async (req, res) => {
