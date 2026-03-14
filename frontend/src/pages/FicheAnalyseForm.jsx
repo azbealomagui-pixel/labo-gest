@@ -1,11 +1,11 @@
 // ===========================================
 // PAGE: FicheAnalyseForm
 // RÔLE: Création d'une fiche d'analyses pour un patient
-// AVEC: Recherche instantanée de code
+// AVEC: Recherche instantanée et bouton PV
 // ===========================================
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; // ← CORRIGÉ
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
@@ -21,12 +21,14 @@ const CURRENCIES = [
 
 const FicheAnalyseForm = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // ← AJOUTÉ
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [patients, setPatients] = useState([]);
   const [analyses, setAnalyses] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedAnalyses, setSelectedAnalyses] = useState([]);
+  const [ficheCreeeId, setFicheCreeeId] = useState(null);
   
   // États pour la saisie en cours
   const [currentCode, setCurrentCode] = useState('');
@@ -50,6 +52,20 @@ const FicheAnalyseForm = () => {
     };
     fetchPatients();
   }, [user.laboratoireId]);
+
+  // ===== SÉLECTION AUTOMATIQUE DU PATIENT DEPUIS L'URL =====
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const patientId = params.get('patientId');
+    
+    if (patientId && patients.length > 0) {
+      const patient = patients.find(p => p._id === patientId);
+      if (patient) {
+        setSelectedPatient(patient);
+        toast.info(`Patient ${patient.nom} ${patient.prenom} présélectionné`);
+      }
+    }
+  }, [location.search, patients]);
 
   // ===== CHARGEMENT DES ANALYSES =====
   useEffect(() => {
@@ -114,7 +130,6 @@ const FicheAnalyseForm = () => {
 
     setSelectedAnalyses([...selectedAnalyses, nouvelleLigne]);
     
-    // Réinitialiser le formulaire
     setCurrentCode('');
     setCurrentAnalyse(null);
     setCurrentQuantite(1);
@@ -192,8 +207,8 @@ const FicheAnalyseForm = () => {
       const response = await api.post('/fiches-analyses', ficheData);
       
       if (response.data.success) {
-        toast.success('Fiche d\'analyse créée avec succès');
-        navigate('/patients');
+        toast.success('✅ Fiche d\'analyse créée avec succès');
+        setFicheCreeeId(response.data.fiche._id);
       }
     } catch (err) {
       console.error('Erreur création:', err);
@@ -235,7 +250,7 @@ const FicheAnalyseForm = () => {
 
           <form onSubmit={handleSubmit}>
             
-            {/* ===== SECTION 1 : PATIENT ===== */}
+            {/* SECTION 1 : PATIENT */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-4">1. Patient</h2>
               <div className="relative mb-4">
@@ -250,24 +265,18 @@ const FicheAnalyseForm = () => {
               </div>
 
               <div className="border rounded-lg max-h-40 overflow-y-auto">
-                {filteredPatients.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    Aucun patient trouvé
+                {filteredPatients.map(p => (
+                  <div
+                    key={p._id}
+                    onClick={() => setSelectedPatient(p)}
+                    className={`p-3 cursor-pointer hover:bg-gray-50 border-b ${
+                      selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
+                    }`}
+                  >
+                    <div className="font-medium">{p.nom} {p.prenom}</div>
+                    <div className="text-sm text-gray-600">{p.telephone}</div>
                   </div>
-                ) : (
-                  filteredPatients.map(p => (
-                    <div
-                      key={p._id}
-                      onClick={() => setSelectedPatient(p)}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 border-b transition-colors ${
-                        selectedPatient?._id === p._id ? 'bg-primary-50 border-l-4 border-l-primary-600' : ''
-                      }`}
-                    >
-                      <div className="font-medium">{p.nom} {p.prenom}</div>
-                      <div className="text-sm text-gray-600">{p.telephone}</div>
-                    </div>
-                  ))
-                )}
+                ))}
               </div>
 
               {selectedPatient && (
@@ -278,7 +287,7 @@ const FicheAnalyseForm = () => {
               )}
             </div>
 
-            {/* ===== SECTION 2 : AJOUT D'ANALYSE (RECHERCHE INSTANTANÉE) ===== */}
+            {/* SECTION 2 : AJOUT D'ANALYSE */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-4">2. Ajouter une analyse</h2>
               
@@ -289,7 +298,7 @@ const FicheAnalyseForm = () => {
                     type="text"
                     value={currentCode}
                     onChange={(e) => setCurrentCode(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-4 py-2 border rounded-lg"
                     placeholder="Tapez 2+ caractères..."
                   />
                 </div>
@@ -336,14 +345,14 @@ const FicheAnalyseForm = () => {
                       min="1"
                       value={currentQuantite}
                       onChange={(e) => setCurrentQuantite(parseInt(e.target.value) || 1)}
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full px-4 py-2 border rounded-lg"
                     />
                   </div>
                   <div className="flex items-end">
                     <button
                       type="button"
                       onClick={addCurrentToFiche}
-                      className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+                      className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 flex items-center gap-2"
                     >
                       <img src={IconAdd} alt="" className="w-5 h-5" />
                       Ajouter
@@ -353,7 +362,7 @@ const FicheAnalyseForm = () => {
               )}
             </div>
 
-            {/* ===== SECTION 3 : LISTE DES ANALYSES ===== */}
+            {/* SECTION 3 : LISTE DES ANALYSES */}
             {selectedAnalyses.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-lg font-semibold mb-4">3. Analyses sélectionnées</h2>
@@ -361,21 +370,21 @@ const FicheAnalyseForm = () => {
                   <table className="min-w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Analyse</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Catégorie</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Prix unitaire</th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Qté</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
+                        <th className="px-4 py-2 text-left">#</th>
+                        <th className="px-4 py-2 text-left">Code</th>
+                        <th className="px-4 py-2 text-left">Analyse</th>
+                        <th className="px-4 py-2 text-left">Catégorie</th>
+                        <th className="px-4 py-2 text-right">Prix unitaire</th>
+                        <th className="px-4 py-2 text-center">Qté</th>
+                        <th className="px-4 py-2 text-right">Total</th>
+                        <th className="px-4 py-2 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedAnalyses.map((a, index) => (
-                        <tr key={index} className={`border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                          <td className="px-4 py-2 text-sm text-gray-500">{index + 1}</td>
-                          <td className="px-4 py-2 font-mono text-sm">{a.code}</td>
+                        <tr key={index} className="border-t">
+                          <td className="px-4 py-2">{index + 1}</td>
+                          <td className="px-4 py-2 font-mono">{a.code}</td>
                           <td className="px-4 py-2">{a.nom}</td>
                           <td className="px-4 py-2">{a.categorie}</td>
                           <td className="px-4 py-2 text-right">
@@ -387,7 +396,7 @@ const FicheAnalyseForm = () => {
                               min="1"
                               value={a.quantite}
                               onChange={(e) => updateQuantite(index, e.target.value)}
-                              className="w-16 px-2 py-1 border rounded text-center text-sm"
+                              className="w-16 px-2 py-1 border rounded text-center"
                             />
                           </td>
                           <td className="px-4 py-2 text-right font-medium">
@@ -396,10 +405,9 @@ const FicheAnalyseForm = () => {
                           <td className="px-4 py-2 text-center">
                             <button
                               onClick={() => removeAnalyse(index)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              title="Supprimer"
+                              className="text-red-600 hover:text-red-800"
                             >
-                              <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
+                              <img src={IconDelete} alt="" className="w-5 h-5" />
                             </button>
                           </td>
                         </tr>
@@ -407,10 +415,10 @@ const FicheAnalyseForm = () => {
                     </tbody>
                     <tfoot className="bg-gray-100">
                       <tr>
-                        <td colSpan="6" className="px-4 py-3 text-right font-bold text-lg">
-                          TOTAL GÉNÉRAL ({selectedAnalyses.length} analyse{selectedAnalyses.length > 1 ? 's' : ''})
+                        <td colSpan="6" className="px-4 py-3 text-right font-bold">
+                          TOTAL GÉNÉRAL
                         </td>
-                        <td className="px-4 py-3 text-right font-bold text-lg text-primary-600">
+                        <td className="px-4 py-3 text-right font-bold text-primary-600">
                           {calculerTotalGeneral().toLocaleString()} {devise}
                         </td>
                         <td></td>
@@ -421,14 +429,14 @@ const FicheAnalyseForm = () => {
               </div>
             )}
 
-            {/* ===== DEVISE ET NOTES ===== */}
+            {/* DEVISE ET NOTES */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium mb-2">Devise</label>
                 <select
                   value={devise}
                   onChange={(e) => setDevise(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2 border rounded-lg"
                 >
                   {CURRENCIES.map(c => (
                     <option key={c.code} value={c.code}>
@@ -443,30 +451,54 @@ const FicheAnalyseForm = () => {
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-4 py-2 border rounded-lg"
                   placeholder="Observations..."
                 />
               </div>
             </div>
 
-            {/* ===== BOUTONS ===== */}
+            {/* BOUTONS */}
             <div className="flex gap-4">
               <button
                 type="submit"
                 disabled={loading || !selectedPatient || selectedAnalyses.length === 0}
-                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {loading ? 'Création...' : 'Créer la fiche'}
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/patients')}
-                className="flex-1 bg-gray-200 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                className="flex-1 bg-gray-200 px-6 py-3 rounded-lg hover:bg-gray-300"
               >
                 Annuler
               </button>
             </div>
           </form>
+
+          {/* BOUTON PV FINAL */}
+          {ficheCreeeId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-700 mb-3 font-medium">✅ Fiche créée avec succès</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/rapport/${ficheCreeeId}`)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  📄 Générer le PV final
+                </button>
+                <button
+                  onClick={() => navigate('/patients')}
+                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+                >
+                  Retour aux patients
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

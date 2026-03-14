@@ -101,7 +101,7 @@ export const genererPDFDevis = async (devis, laboratoire, utilisateur) => {
     // En-tête
     doc.setFontSize(24);
     doc.setTextColor(37, 99, 235);
-    doc.text('LABOGEST', 50, 20);
+    doc.text('LABOGES', 50, 20);
     
     doc.setFontSize(10);
     doc.setTextColor(75, 85, 99);

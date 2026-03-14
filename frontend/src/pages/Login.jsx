@@ -44,7 +44,7 @@ const Login = () => {
       <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <img src={LogoLab} alt="LaboGest" className="h-20 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900">LaboGest</h1>
+          <h1 className="text-3xl font-bold text-gray-900">LaboGes</h1>
           <p className="text-sm text-gray-600 mt-2">
             Gestion de laboratoire médical
           </p>

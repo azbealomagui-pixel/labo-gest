@@ -54,6 +54,7 @@ function App() {
           pauseOnHover
           theme="colored"
         />
+        <InstallPWA />
         
         <Routes>
           {/* ===== ROUTES PUBLIQUES ===== */}

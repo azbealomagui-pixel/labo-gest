@@ -1,7 +1,7 @@
 // ===========================================
 // PAGE: Patients
 // RÔLE: Liste, recherche et gestion des patients
-// AVEC: Recherche instantanée (dès 2 caractères)
+// AVEC: Recherche instantanée, PDF, Excel
 // ===========================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -9,42 +9,36 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
-// ===== IMPORTS AJOUTÉS =====
 import { genererPDFPatient } from '../utils/pdfGenerator';
 import { exportToExcel } from '../utils/excelGenerator';
 
-// Import des icônes personnalisées
+// Import des icônes
 import { IconSearch, IconAdd, IconEdit, IconDelete } from '../assets';
 
-/**
- * Composant de gestion des patients
- * @returns {JSX.Element} Page de liste des patients
- */
 const Patients = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // États du composant
-  const [patients, setPatients] = useState([]);        // Liste complète des patients
-  const [filteredPatients, setFilteredPatients] = useState([]); // Liste filtrée (recherche instantanée)
-  const [loading, setLoading] = useState(true);        // État de chargement
-  const [searchTerm, setSearchTerm] = useState('');    // Terme de recherche
+  // États
+  const [patients, setPatients] = useState([]);
+  const [filteredPatients, setFilteredPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [laboratoire, setLaboratoire] = useState(null);
 
-  /**
-   * Fonction pour charger tous les patients du laboratoire
-   */
+  // ===== CHARGEMENT DES PATIENTS =====
   const fetchAllPatients = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/patients/labo/${user.laboratoireId}`);
       const data = response.data.patients || [];
       setPatients(data);
-      setFilteredPatients(data); // Initialiser la liste filtrée
-    } catch (err) {
-      console.error('Erreur détaillée chargement patients:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data
+      setFilteredPatients(data);
+    } catch (error) {
+      console.error('Erreur chargement patients:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
       });
       toast.error('Impossible de charger la liste des patients');
     } finally {
@@ -52,9 +46,22 @@ const Patients = () => {
     }
   }, [user.laboratoireId]);
 
-  /**
-   * Chargement initial des patients
-   */
+  // ===== CHARGEMENT DU LABORATOIRE =====
+  useEffect(() => {
+    const fetchLabo = async () => {
+      try {
+        const response = await api.get(`/laboratoires/${user.laboratoireId}`);
+        setLaboratoire(response.data.laboratoire);
+      } catch (error) {
+        console.error('Erreur chargement labo:', error.message);
+      }
+    };
+    if (user?.laboratoireId) {
+      fetchLabo();
+    }
+  }, [user?.laboratoireId]);
+
+  // ===== CHARGEMENT INITIAL =====
   useEffect(() => {
     fetchAllPatients();
   }, [fetchAllPatients]);
@@ -63,7 +70,6 @@ const Patients = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm.length >= 2) {
-        // Filtrer en temps réel
         const filtered = patients.filter(p => 
           p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
           p.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,42 +78,18 @@ const Patients = () => {
         );
         setFilteredPatients(filtered);
         
-        // Optionnel : feedback si aucun résultat
         if (filtered.length === 0) {
           toast.info('Aucun patient trouvé pour cette recherche', { autoClose: 2000 });
         }
       } else {
-        // Moins de 2 caractères → afficher tout
         setFilteredPatients(patients);
       }
-    }, 300); // Délai de 300ms pour éviter les calculs trop fréquents
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [searchTerm, patients]);
 
-
-  const [laboratoire, setLaboratoire] = useState(null);
-
-  // ===== CHARGEMENT DES INFOS LABORATOIRE =====
-  useEffect(() => {
-    const fetchLabo = async () => {
-      try {
-        const response = await api.get(`/laboratoires/${user.laboratoireId}`);
-        setLaboratoire(response.data.laboratoire);
-      } catch (err) {
-        console.error('Erreur chargement labo:', err);
-      }
-    };
-    if (user?.laboratoireId) {
-      fetchLabo();
-    }
-  }, [user?.laboratoireId]);
-
-
-  /**
-   * Suppression (désactivation) d'un patient
-   */
-  // ===== SUPPRESSION D'UN PATIENT =====
+  // ===== SUPPRESSION =====
   const handleDelete = async (id) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce patient ? Cette action est réversible.')) {
       return;
@@ -117,11 +99,9 @@ const Patients = () => {
       await api.delete(`/patients/${id}`);
       toast.success('Patient supprimé avec succès');
       
-      // FORCER LA MISE À JOUR DES LISTES
       const updatedPatients = patients.filter(p => p._id !== id);
       setPatients(updatedPatients);
       
-      // Mettre à jour la liste filtrée
       if (searchTerm.length >= 2) {
         const filtered = updatedPatients.filter(p => 
           p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,13 +113,12 @@ const Patients = () => {
         setFilteredPatients(updatedPatients);
       }
       
-    } catch (err) {
-      console.error('Erreur suppression:', err);
-      toast.error(err.response?.data?.message || 'Erreur lors de la suppression');
+    } catch (error) {
+      console.error('Erreur suppression:', error.message);
+      toast.error(error.response?.data?.message || 'Erreur lors de la suppression');
     }
   };
 
-  // Affichage du loader pendant le chargement
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -168,7 +147,7 @@ const Patients = () => {
           </button>
         </div>
 
-        {/* ===== EN-TÊTE ===== */}
+        {/* En-tête */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
@@ -180,7 +159,7 @@ const Patients = () => {
           </div>
           
           <div className="flex gap-4">
-            {/* ===== BOUTON EXCEL GLOBAL ===== */}
+            {/* Bouton Excel global */}
             <button
               onClick={() => {
                 try {
@@ -210,8 +189,8 @@ const Patients = () => {
                     observations: 'Observations'
                   });
                   toast.success(`${patientsAExporter.length} patients exportés`);
-                } catch (err) {
-                  console.error('Erreur Excel:', err);
+                } catch (error) {
+                  console.error('Erreur Excel:', error.message);
                   toast.error('Erreur génération Excel');
                 }
               }}
@@ -234,13 +213,10 @@ const Patients = () => {
           </div>
         </div>
 
-        {/* ===== BARRE DE RECHERCHE INSTANTANÉE ===== */}
+        {/* Barre de recherche */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <div className="flex flex-col gap-4">
             <div className="flex-1 relative">
-              <label htmlFor="search" className="sr-only">
-                Rechercher un patient
-              </label>
               <input
                 id="search"
                 type="text"
@@ -251,12 +227,7 @@ const Patients = () => {
                 disabled={loading}
                 autoFocus
               />
-              <img 
-                src={IconSearch} 
-                alt="" 
-                className="w-5 h-5 absolute left-4 top-3.5 text-gray-400" 
-                aria-hidden="true"
-              />
+              <img src={IconSearch} alt="" className="w-5 h-5 absolute left-4 top-3.5 text-gray-400" />
             </div>
             
             {searchTerm.length >= 2 && (
@@ -267,10 +238,9 @@ const Patients = () => {
           </div>
         </div>
 
-        {/* ===== TABLEAU DES PATIENTS ===== */}
+        {/* Tableau */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           {filteredPatients.length === 0 ? (
-            // Message si aucun patient
             <div className="text-center py-16 px-4">
               <div className="text-gray-400 mb-4">
                 <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,38 +258,27 @@ const Patients = () => {
               {!searchTerm && (
                 <button
                   onClick={() => navigate('/patients/new')}
-                  className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors">
+                  className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
+                >
                   <img src={IconAdd} alt="" className="w-5 h-5" />
                   Ajouter un patient
                 </button>
               )}
             </div>
           ) : (
-            // Tableau des patients
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Patient
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      N° Sécurité Sociale
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">N° Sécurité Sociale</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredPatients.map((patient) => (
-                    <tr 
-                      key={patient._id} 
-                      className="hover:bg-gray-50 transition-colors">
-                      {/* Colonne Patient */}
+                    <tr key={patient._id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
                           {patient.nom} {patient.prenom}
@@ -332,86 +291,89 @@ const Patients = () => {
                           })} • {patient.sexe}
                         </div>
                       </td>
-                      
-                      {/* Colonne Contact */}
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">{patient.telephone}</div>
-                        {patient.email && (
-                          <div className="text-sm text-gray-500">{patient.email}</div>
-                        )}
+                        {patient.email && <div className="text-sm text-gray-500">{patient.email}</div>}
                       </td>
-                      
-                      {/* Colonne N° Sécurité Sociale */}
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           {patient.numeroSecuriteSociale || '-'}
                         </div>
                       </td>
-                      
-                      {/* Colonne Actions - SANS bouton Excel */}
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        {/* Bouton Modifier */}
-                        <button
-                          onClick={() => navigate(`/patients/${patient._id}`)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Modifier le patient">
-                          <img src={IconEdit} alt="Modifier" className="w-5 h-5" />
-                        </button>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          {/* Modifier */}
+                          <button
+                            onClick={() => navigate(`/patients/${patient._id}`)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            title="Modifier"
+                          >
+                            <img src={IconEdit} alt="" className="w-5 h-5" />
+                          </button>
 
-                        {/* Bouton PDF Ouvrir */}
-                        <button
-                          onClick={async () => {
-                            try {
-                              const doc = await genererPDFPatient(patient, laboratoire);
-                              if (doc) {
-                                const pdfBlob = doc.output('blob');
-                                const url = URL.createObjectURL(pdfBlob);
-                                window.open(url, '_blank');
-                                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          {/* PDF Ouvrir */}
+                          <button
+                            onClick={async () => {
+                              try {
+                                const doc = await genererPDFPatient(patient, laboratoire);
+                                if (doc) {
+                                  const url = URL.createObjectURL(doc.output('blob'));
+                                  window.open(url, '_blank');
+                                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                                }
+                              } catch (error) {
+                                console.error('Erreur PDF:', error.message);
+                                toast.error('Erreur génération PDF');
                               }
-                            } catch (err) {
-                              console.error('Erreur PDF:', err);
-                              toast.error('Erreur génération PDF');
-                            }
-                          }}
-                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="Ouvrir le PDF"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                        </button>
+                            }}
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                            title="Ouvrir PDF"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </button>
 
-                        {/* Bouton PDF Télécharger */}
-                        <button
-                          onClick={async () => {
-                            try {
-                              const doc = await genererPDFPatient(patient, laboratoire);
-                              if (doc) {
-                                doc.save(`patient-${patient.nom}-${patient.prenom}.pdf`);
+                          {/* PDF Télécharger */}
+                          <button
+                            onClick={async () => {
+                              try {
+                                const doc = await genererPDFPatient(patient, laboratoire);
+                                if (doc) doc.save(`patient-${patient.nom}-${patient.prenom}.pdf`);
+                              } catch (error) {
+                                console.error('Erreur PDF:', error.message);
+                                toast.error('Erreur téléchargement PDF');
                               }
-                            } catch (err) {
-                              console.error('Erreur PDF:', err);
-                              toast.error('Erreur téléchargement PDF');
-                            }
-                          }}
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Télécharger le PDF">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
+                            }}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                            title="Télécharger PDF"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
 
-                        {/* Bouton Supprimer */}
-                        <button
-                          onClick={() => handleDelete(patient._id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Supprimer le patient">
-                          <img src={IconDelete} alt="Supprimer" className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
+                          {/* Nouvelle fiche d'analyses */}
+                          <button
+                            onClick={() => navigate(`/fiche-analyses/new?patientId=${patient._id}`)}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                            title="Nouvelle fiche d'analyses"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                          </button>
+
+                          {/* Supprimer */}
+                          <button
+                            onClick={() => handleDelete(patient._id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            title="Supprimer"
+                          >
+                            <img src={IconDelete} alt="" className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
