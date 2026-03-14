@@ -21,12 +21,6 @@ import FicheAnalyseForm from './pages/FicheAnalyseForm';
 import CreerEspace from './pages/CreerEspace';
 import Register from './pages/Register';
 
-
-
-
-// Dans les routes publiques (avant les routes protégées)
-<Route path="/register" element={<Register />} />
-
 /**
  * Composant pour les routes protégées
  * Redirige vers login si non authentifié
@@ -55,6 +49,8 @@ function App() {
       <Routes>
         {/* ===== ROUTES PUBLIQUES ===== */}
         <Route path="/login" element={<Login />} />
+        // Dans les routes publiques (avant les routes protégées)
+        <Route path="/register" element={<Register />} />
         
         {/* ===== REDIRECTION PAR DÉFAUT ===== */}
         <Route path="/" element={<Navigate to="/login" replace />} />
@@ -126,6 +122,14 @@ function App() {
             <DevisForm />
           </ProtectedRoute>
         } />
+
+        // Dans les routes protégées, après les autres routes
+        <Route path="/creer-espace" element={
+          <ProtectedRoute>
+            <CreerEspace />
+          </ProtectedRoute>
+        } />
+
         
         {/* ===== ROUTE 404 ===== */}
         <Route path="*" element={
@@ -140,13 +144,6 @@ function App() {
               </a>
             </div>
           </div>
-        } />
-
-        // Dans les routes protégées, après les autres routes
-        <Route path="/creer-espace" element={
-          <ProtectedRoute>
-            <CreerEspace />
-          </ProtectedRoute>
         } />
 
 
