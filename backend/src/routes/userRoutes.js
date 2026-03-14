@@ -1,18 +1,21 @@
 // ===========================================
 // FICHIER: src/routes/userRoutes.js
+// RÔLE: Routes pour la gestion des utilisateurs
+// VERSION: Finale avec inscription, login et CRUD
 // ===========================================
 
-//const mongoose = require('mongoose');
 const express = require('express');
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { default: mongoose } = require('mongoose');
 const router = express.Router();
 
-// POST créer un utilisateur
+// ===========================================
+// CRÉER UN UTILISATEUR (POST)
+// ===========================================
 router.post('/', async (req, res) => {
   try {
-
-    // 👇 AJOUTEZ CES LIGNES POUR DEBUG
+    // Log de débogage (à supprimer en production)
     console.log('=== REQUÊTE REÇUE ===');
     console.log('Body complet:', req.body);
     console.log('laboratoireId:', req.body.laboratoireId);
@@ -21,25 +24,46 @@ router.post('/', async (req, res) => {
     
     const { nom, prenom, email, password, role, laboratoireId } = req.body;
     
-    // Vérifier email existant
+    // Validation des champs obligatoires
+    const missingFields = [];
+    if (!nom) missingFields.push('nom');
+    if (!prenom) missingFields.push('prenom');
+    if (!email) missingFields.push('email');
+    if (!password) missingFields.push('password');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Champs obligatoires manquants',
+        required: missingFields
+      });
+    }
+    
+    // Vérifier si l'email existe déjà
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
         message: 'Cet email est déjà utilisé'
       });
     }
     
-    // Créer l'utilisateur 
-    const newUser = new User({
+    // Préparer les données
+    const userData = {
       nom,
       prenom,
       email,
       password,
-      role: role || 'technicien',
-      laboratoireId: new mongoose.Types.ObjectId(laboratoireId)
-    });
-    
+      role: role || 'technicien'
+    };
+
+    // Ajouter laboratoireId si fourni
+    if (laboratoireId) {
+      userData.laboratoireId = new mongoose.Types.ObjectId(laboratoireId);
+    }
+
+    // Créer l'utilisateur 
+    const newUser = new User(userData);
     await newUser.save();
     
     // Réponse sans mot de passe
@@ -53,43 +77,119 @@ router.post('/', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('❌ Erreur création utilisateur:', error);
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Erreur de validation',
+        errors: Object.keys(error.errors).map(key => ({
+          field: key,
+          message: error.errors[key].message
+        }))
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Erreur serveur'
     });
   }
 });
 
-// GET tous les utilisateurs
+// ===========================================
+// LISTER TOUS LES UTILISATEURS (GET)
+// ===========================================
 router.get('/', async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const users = await User.find()
+      .select('-password')
+      .sort({ createdAt: -1 });
+
     res.json({
       success: true,
       count: users.length,
       users
     });
   } catch (error) {
+    console.error('❌ Erreur listage utilisateurs:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Erreur serveur'
     });
   }
 });
 
+// ===========================================
+// OBTENIR UN UTILISATEUR PAR ID (GET)
+// ===========================================
+router.get('/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      user
+    });
+  } catch (error) {
+    console.error('❌ Erreur récupération utilisateur:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'ID utilisateur invalide'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erreur serveur'
+    });
+  }
+});
 
 // ===========================================
-// INSCRIPTION D'UN NOUVEL UTILISATEUR
+// INSCRIPTION D'UN NOUVEL UTILISATEUR (POST /register)
 // ===========================================
 router.post('/register', async (req, res) => {
   try {
-    const { nom, prenom, email, password, role } = req.body;
+    const { nom, prenom, email, password } = req.body;
 
     // Validation
-    if (!nom || !prenom || !email || !password) {
+    const missingFields = [];
+    if (!nom) missingFields.push('nom');
+    if (!prenom) missingFields.push('prenom');
+    if (!email) missingFields.push('email');
+    if (!password) missingFields.push('password');
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Tous les champs sont obligatoires'
+        message: 'Tous les champs sont obligatoires',
+        required: missingFields
+      });
+    }
+
+    // Validation email
+    if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format email invalide'
+      });
+    }
+
+    // Validation mot de passe (minimum 6 caractères)
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le mot de passe doit contenir au moins 6 caractères'
       });
     }
 
@@ -102,13 +202,14 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Créer l'utilisateur
+    // Créer l'utilisateur (manager par défaut)
     const newUser = new User({
       nom,
       prenom,
       email,
       password,
-      role: role || 'manager_labo'
+      role: 'manager_labo',
+      estProprietaire: false // Sera mis à jour après création d'espace
     });
 
     await newUser.save();
@@ -124,23 +225,34 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erreur inscription:', error);
+    console.error('❌ Erreur inscription:', error);
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Erreur de validation',
+        errors: Object.keys(error.errors).map(key => ({
+          field: key,
+          message: error.errors[key].message
+        }))
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Erreur serveur'
     });
   }
 });
 
-
 // ===========================================
-// NOUVELLE ROUTE : LOGIN
+// CONNEXION UTILISATEUR (POST /login)
 // ===========================================
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // 1. Vérifier si email et password sont fournis
+    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -148,7 +260,7 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    // 2. Chercher l'utilisateur par email
+    // Chercher l'utilisateur par email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({
@@ -157,8 +269,7 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    // 3. Vérifier le mot de passe 
-    // PLUS TARD on utilisera bcrypt.compare
+    // Vérifier le mot de passe (à remplacer par bcrypt.compare plus tard)
     if (user.password !== password) {
       return res.status(401).json({
         success: false,
@@ -166,7 +277,7 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    // 4. Vérifier si le compte est actif
+    // Vérifier si le compte est actif
     if (!user.actif) {
       return res.status(403).json({
         success: false,
@@ -174,19 +285,19 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    // 5. Créer un token JWT
-    const jwt = require('jsonwebtoken');
+    // Créer le token JWT
     const token = jwt.sign(
       { 
         userId: user._id,
         email: user.email,
-        role: user.role
+        role: user.role,
+        espaceId: user.espaceId
       },
       process.env.JWT_SECRET || 'dev_secret_temporaire',
-      { expiresIn: '7d' } // Token valide 7 jours
+      { expiresIn: '7d' }
     );
     
-    // 6. Réponse sans mot de passe
+    // Réponse sans mot de passe
     const userResponse = user.toObject();
     delete userResponse.password;
     
@@ -198,9 +309,79 @@ router.post('/login', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('❌ Erreur connexion:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Erreur serveur'
+    });
+  }
+});
+
+// ===========================================
+// METTRE À JOUR UN UTILISATEUR (PUT)
+// ===========================================
+router.put('/:id', async (req, res) => {
+  try {
+    // Empêcher la modification du mot de passe via cette route
+    const updates = { ...req.body };
+    delete updates.password;
+    delete updates._id;
+    delete updates.__v;
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      updates,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Utilisateur mis à jour',
+      user
+    });
+  } catch (error) {
+    console.error('❌ Erreur mise à jour:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erreur serveur'
+    });
+  }
+});
+
+// ===========================================
+// SUPPRIMER (DÉSACTIVER) UN UTILISATEUR (DELETE)
+// ===========================================
+router.delete('/:id', async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { actif: false },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Utilisateur désactivé'
+    });
+  } catch (error) {
+    console.error('❌ Erreur suppression:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Erreur serveur'
     });
   }
 });

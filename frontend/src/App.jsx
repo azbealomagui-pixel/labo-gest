@@ -1,7 +1,7 @@
 // ===========================================
 // FICHIER: src/App.jsx
 // RÔLE: Configuration des routes principales
-// VERSION: Optimisée et renforcée
+// VERSION: Finale avec inscriptions et espace
 // ===========================================
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -44,12 +44,12 @@ function App() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="colored"/>
+        theme="colored"
+      />
       
       <Routes>
         {/* ===== ROUTES PUBLIQUES ===== */}
         <Route path="/login" element={<Login />} />
-        // Dans les routes publiques (avant les routes protégées)
         <Route path="/register" element={<Register />} />
         
         {/* ===== REDIRECTION PAR DÉFAUT ===== */}
@@ -62,7 +62,7 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* Patients */}
+        {/* ===== GESTION DES PATIENTS ===== */}
         <Route path="/patients" element={
           <ProtectedRoute>
             <Patients />
@@ -79,7 +79,7 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* Analyses */}
+        {/* ===== GESTION DES ANALYSES ===== */}
         <Route path="/analyses" element={
           <ProtectedRoute>
             <Analyses />
@@ -96,40 +96,36 @@ function App() {
           </ProtectedRoute>
         } />
 
-        {/* Fiche d'analyses patient */}
+        {/* ===== FICHE D'ANALYSES PATIENT ===== */}
         <Route path="/fiche-analyses/new" element={
           <ProtectedRoute>
             <FicheAnalyseForm />
           </ProtectedRoute>
         } />
         
-        {/* Devis */}
+        {/* ===== GESTION DES DEVIS ===== */}
         <Route path="/devis" element={
           <ProtectedRoute>
             <Devis />
           </ProtectedRoute>
         } />
-        {/* NOUVELLE ROUTE POUR MODIFIER UN DEVIS */}
         <Route path="/devis/:id" element={
           <ProtectedRoute>
             <DevisForm />
           </ProtectedRoute>
         } />
-
-
         <Route path="/devis/new" element={
           <ProtectedRoute>
             <DevisForm />
           </ProtectedRoute>
         } />
 
-        // Dans les routes protégées, après les autres routes
+        {/* ===== CRÉATION D'ESPACE (après inscription) ===== */}
         <Route path="/creer-espace" element={
           <ProtectedRoute>
             <CreerEspace />
           </ProtectedRoute>
         } />
-
         
         {/* ===== ROUTE 404 ===== */}
         <Route path="*" element={
@@ -139,15 +135,13 @@ function App() {
               <p className="text-gray-600 mb-6">Page non trouvée</p>
               <a 
                 href="/dashboard" 
-                className="inline-block bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors">
+                className="inline-block bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
+              >
                 Retour au tableau de bord
               </a>
             </div>
           </div>
         } />
-
-
-        
       </Routes>
 
       {/* ===== FOOTER PROFESSIONNEL ===== */}

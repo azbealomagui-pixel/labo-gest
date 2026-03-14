@@ -1,6 +1,7 @@
 // ===========================================
 // PAGE: Dashboard
 // RÔLE: Tableau de bord avec statistiques réelles
+// VERSION: Finale avec actions rapides
 // ===========================================
 
 import React, { useEffect, useState } from 'react';
@@ -31,20 +32,22 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState({
-    labels: [], datasets: []});
+    labels: [],
+    datasets: []
+  });
 
-  // Charger les données
+  // ===== CHARGEMENT DES DONNÉES =====
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Compter les patients
+        // Compter les patients
         const patientsRes = await api.get(`/patients/labo/${user.laboratoireId}`);
-        // 2. Compter les analyses
+        // Compter les analyses
         const analysesRes = await api.get(`/analyses/labo/${user.laboratoireId}`);
-        // 3. Compter les devis
+        // Compter les devis
         const devisRes = await api.get(`/devis/labo/${user.laboratoireId}`);
         
-        // 4. Récupérer les stats rapides (si disponible)
+        // Récupérer les stats rapides (si disponible)
         let caMensuel = 0;
         try {
           const quickRes = await api.get(`/stats/labo/${user.laboratoireId}/quick`);
@@ -61,7 +64,7 @@ const Dashboard = () => {
           ca: caMensuel
         });
 
-        // 5. Données pour le graphique (évolution mensuelle)
+        // Données pour le graphique (évolution mensuelle)
         try {
           const evoRes = await api.get(`/stats/labo/${user.laboratoireId}?period=6months`);
           if (evoRes.data.evolution && evoRes.data.evolution.length > 0) {
@@ -87,7 +90,6 @@ const Dashboard = () => {
           }
         } catch (err) {
           console.error('Erreur détaillée:', err.message);
-            // et si nécessaire
           toast.error('Données d\'évolution non disponibles');
         }
 
@@ -102,7 +104,7 @@ const Dashboard = () => {
     if (user) fetchData();
   }, [user]);
 
-  // Carte de statistique réutilisable
+  // ===== CARTE DE STATISTIQUE RÉUTILISABLE =====
   const StatCard = ({ title, value, icon: Icon, bgColor }) => (
     <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all transform hover:-translate-y-1">
       <div className="flex items-center justify-between">
@@ -117,10 +119,9 @@ const Dashboard = () => {
     </div>
   );
 
+  // ===== AFFICHAGE DU LOADER =====
   if (loading) {
     return (
-      console.log('Rendering dashboard, stats:', stats),
-      console.log('Loading state:', loading),
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-600 border-t-transparent"></div>
       </div>
@@ -129,7 +130,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* En-tête */}
+      
+      {/* ===== EN-TÊTE ===== */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -154,10 +156,10 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Contenu principal */}
+      {/* ===== CONTENU PRINCIPAL ===== */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Message de bienvenue */}
+        {/* ===== MESSAGE DE BIENVENUE ===== */}
         <div className="mb-8 bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center gap-6">
             <img src={DashboardIllus} alt="Dashboard" className="h-24 w-24" />
@@ -172,7 +174,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Cartes statistiques */}
+        {/* ===== CARTES STATISTIQUES ===== */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Patients"
@@ -200,7 +202,7 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Graphique d'activité (affiché seulement s'il y a des données) */}
+        {/* ===== GRAPHIQUE D'ACTIVITÉ ===== */}
         {chartData.labels.length > 0 && (
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -210,68 +212,69 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Actions rapides */}
-<h3 className="text-lg font-semibold text-gray-900 mb-4">Actions rapides</h3>
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-  
-  {/* Bouton Nouveau patient */}
-  <button
-    onClick={() => navigate('/patients/new')}
-    className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group"
-  >
-    <img src={IconAdd} alt="Ajouter" className="w-12 h-12 mb-4" />
-    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
-      Nouveau patient
-    </h3>
-    <p className="text-sm text-gray-500 mt-1">
-      Enregistrer un patient
-    </p>
-  </button>
-  
-  {/* Bouton Nouvelle analyse */}
-  <button
-    onClick={() => navigate('/analyses/new')}
-    className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group"
-  >
-    <img src={IconAnalyses} alt="Ajouter" className="w-12 h-12 mb-4" />
-    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
-      Nouvelle analyse
-    </h3>
-    <p className="text-sm text-gray-500 mt-1">
-      Ajouter au catalogue
-    </p>
-  </button>
-  
-  {/*NOUVEAU BOUTON - Fiche d'analyses patient */}
-  <button
-    onClick={() => navigate('/fiche-analyses/new')}
-    className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group border-2 border-primary-100 hover:border-primary-300"
-  >
-    <svg className="w-12 h-12 mb-4 text-primary-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-    </svg>
-    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
-      Fiche d'analyses
-    </h3>
-    <p className="text-sm text-gray-500 mt-1">
-      Analyses patient
-    </p>
-  </button>
-  
-  {/* Bouton Nouveau devis */}
-  <button
-    onClick={() => navigate('/devis/new')}
-    className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group"
-  >
-    <img src={IconDevis} alt="Ajouter" className="w-12 h-12 mb-4" />
-    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
-      Nouveau devis
-    </h3>
-    <p className="text-sm text-gray-500 mt-1">
-      Créer un devis
-    </p>
-  </button>
-</div>      </main>
+        {/* ===== ACTIONS RAPIDES ===== */}
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions rapides</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {/* Bouton Nouveau patient */}
+          <button
+            onClick={() => navigate('/patients/new')}
+            className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group"
+          >
+            <img src={IconAdd} alt="Ajouter" className="w-12 h-12 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
+              Nouveau patient
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Enregistrer un patient
+            </p>
+          </button>
+          
+          {/* Bouton Nouvelle analyse */}
+          <button
+            onClick={() => navigate('/analyses/new')}
+            className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group"
+          >
+            <img src={IconAnalyses} alt="Ajouter" className="w-12 h-12 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
+              Nouvelle analyse
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Ajouter au catalogue
+            </p>
+          </button>
+          
+          {/* Bouton Fiche d'analyses patient */}
+          <button
+            onClick={() => navigate('/fiche-analyses/new')}
+            className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group border-2 border-primary-100 hover:border-primary-300"
+          >
+            <svg className="w-12 h-12 mb-4 text-primary-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
+              Fiche d'analyses
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Analyses patient
+            </p>
+          </button>
+          
+          {/* Bouton Nouveau devis */}
+          <button
+            onClick={() => navigate('/devis/new')}
+            className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-left group"
+          >
+            <img src={IconDevis} alt="Ajouter" className="w-12 h-12 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600">
+              Nouveau devis
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Créer un devis
+            </p>
+          </button>
+        </div>
+      </main>
     </div>
   );
 };
