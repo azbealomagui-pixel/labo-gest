@@ -1,8 +1,5 @@
-// ===========================================
-// MODÈLE: Espace
-// RÔLE: Représente un espace client sur LaboGest
-// VERSION: Sans erreur next is not a function
-// ===========================================
+// ===================
+// ===================
 
 const mongoose = require('mongoose');
 
@@ -10,7 +7,7 @@ const espaceSchema = new mongoose.Schema({
   nom: {
     type: String,
     required: [true, 'Le nom de l\'espace est requis'],
-    unique: true,
+    unique: true,        // ← DÉJÀ UN INDEX
     trim: true,
     minlength: [3, 'Le nom doit contenir au moins 3 caractères'],
     maxlength: [100, 'Le nom ne peut pas dépasser 100 caractères']
@@ -36,7 +33,7 @@ const espaceSchema = new mongoose.Schema({
   numeroLicence: {
     type: String,
     required: [true, 'Le numéro de licence est requis'],
-    unique: true,
+    unique: true,        // ← DÉJÀ UN INDEX
     trim: true
   },
   numeroFiscal: {
@@ -84,16 +81,14 @@ const espaceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// ===== INDEX =====
-espaceSchema.index({ nom: 1 });
-espaceSchema.index({ numeroLicence: 1 });
-espaceSchema.index({ email: 1 });
+// ===== INDEX (GARDER SEULEMENT CEUX QUI NE SONT PAS DÉJÀ CRÉÉS) =====
+// espaceSchema.index({ nom: 1 });        // ← À SUPPRIMER (déjà avec unique: true)
+// espaceSchema.index({ numeroLicence: 1 }); // ← À SUPPRIMER (déjà avec unique: true)
 
-// ===== MIDDLEWARE PRE-SAVE SIMPLIFIÉ (SANS next) =====
-// On utilise des hooks natifs ou on évite les middlewares complexes
-// PAS DE MIDDLEWARE PRE-SAVE POUR ÉVITER L'ERREUR
+// Garder seulement l'index sur email (pas unique)
+espaceSchema.index({ email: 1 });          // ← À GARDER (pas de unique:true sur email)
 
-// ===== VIRTUELS (optionnels) =====
+// ===== VIRTUELS =====
 espaceSchema.virtual('employesCount', {
   ref: 'User',
   localField: '_id',

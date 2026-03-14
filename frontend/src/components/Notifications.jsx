@@ -4,7 +4,7 @@
 // ===========================================
 
 import React, { useState } from 'react';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../hooks/useSocket';
 import { IconCheck, IconDelete } from '../assets';
 
 const Notifications = () => {
