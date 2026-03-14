@@ -23,7 +23,7 @@ import Register from './pages/Register';
 import GestionMembres from './pages/GestionMembres';
 import RapportForm from './pages/RapportForm';
 import Messagerie from './pages/Messagerie';
-
+import Abonnement from './pages/Abonnement';
 
 
 /**
@@ -163,6 +163,12 @@ function App() {
       <Route path="/messages" element={
         <ProtectedRoute>
           <Messagerie />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/abonnement" element={
+        <ProtectedRoute>
+          <Abonnement />
         </ProtectedRoute>
       } />
       

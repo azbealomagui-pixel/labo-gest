@@ -67,6 +67,8 @@ const ficheAnalyseRoutes = require('./src/routes/ficheAnalyseRoutes');
 const espaceRoutes = require('./src/routes/espaceRoutes');
 const rapportRoutes = require('./src/routes/rapportRoutes');
 const messageRoutes = require('./src/routes/messageRoutes');
+const abonnementRoutes = require('./src/routes/abonnementRoutes');
+
 
 
 
@@ -86,7 +88,7 @@ app.use('/api/fiches-analyses', ficheAnalyseRoutes);
 app.use('/api/espaces', espaceRoutes);
 app.use('/api/rapports', rapportRoutes);
 app.use('/api/messages', messageRoutes);
-
+app.use('/api/abonnements', abonnementRoutes);
 
 
 
