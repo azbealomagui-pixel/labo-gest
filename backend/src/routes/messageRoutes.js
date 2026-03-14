@@ -1,6 +1,7 @@
 // ===========================================
 // ROUTES: messageRoutes.js
 // RÔLE: Gestion des messages internes
+// AVEC: Notifications Socket.IO intégrées
 // ===========================================
 
 const express = require('express');
@@ -8,7 +9,9 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const router = express.Router();
 
-// ===== ENVOYER UN MESSAGE =====
+// ===========================================
+// ENVOYER UN MESSAGE (POST)
+// ===========================================
 router.post('/', async (req, res) => {
   try {
     const { espaceId, expediteur, destinataires, sujet, contenu, piecesJointes } = req.body;
@@ -21,6 +24,7 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Créer le message
     const nouveauMessage = new Message({
       espaceId,
       expediteur,
@@ -28,7 +32,7 @@ router.post('/', async (req, res) => {
       sujet,
       contenu,
       piecesJointes: piecesJointes || [],
-      lu: [{ userId: expediteur, date: new Date() }] // L'expéditeur a "lu" son propre message
+      lu: [{ userId: expediteur, date: new Date() }]
     });
 
     await nouveauMessage.save();
@@ -36,6 +40,24 @@ router.post('/', async (req, res) => {
     // Peupler les données pour la réponse
     await nouveauMessage.populate('expediteur', 'nom prenom email');
     await nouveauMessage.populate('destinataires', 'nom prenom email');
+
+    // ===== ÉMETTRE LES NOTIFICATIONS SOCKET.IO =====
+    try {
+      const io = req.app.get('io'); // Récupérer l'instance io depuis l'app
+      if (io) {
+        nouveauMessage.destinataires.forEach(destinataireId => {
+          io.to(destinataireId.toString()).emit('nouveau-message', {
+            messageId: nouveauMessage._id,
+            expediteur: nouveauMessage.expediteur,
+            sujet: nouveauMessage.sujet,
+            date: nouveauMessage.dateEnvoi
+          });
+        });
+      }
+    } catch (socketError) {
+      console.error('❌ Erreur envoi notification socket:', socketError);
+      // On continue, le message est quand même sauvegardé
+    }
 
     res.status(201).json({
       success: true,
@@ -52,7 +74,9 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ===== LISTER LES MESSAGES D'UN UTILISATEUR =====
+// ===========================================
+// LISTER LES MESSAGES D'UN UTILISATEUR (GET)
+// ===========================================
 router.get('/utilisateur/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -75,7 +99,7 @@ router.get('/utilisateur/:userId', async (req, res) => {
     const messagesAvecStatut = messages.map(msg => {
       const msgObj = msg.toObject();
       msgObj.estLu = msg.lu.some(l => l.userId.toString() === userId);
-      msgObj.nonLu = msg.lu.length - 1; // Nombre de destinataires n'ayant pas lu
+      msgObj.nonLu = msg.lu.length - 1;
       return msgObj;
     });
 
@@ -94,7 +118,9 @@ router.get('/utilisateur/:userId', async (req, res) => {
   }
 });
 
-// ===== MARQUER UN MESSAGE COMME LU =====
+// ===========================================
+// MARQUER UN MESSAGE COMME LU (PATCH)
+// ===========================================
 router.patch('/:id/lire/:userId', async (req, res) => {
   try {
     const { id, userId } = req.params;
@@ -128,7 +154,9 @@ router.patch('/:id/lire/:userId', async (req, res) => {
   }
 });
 
-// ===== ARCHIVER UN MESSAGE =====
+// ===========================================
+// ARCHIVER UN MESSAGE (PATCH)
+// ===========================================
 router.patch('/:id/archiver', async (req, res) => {
   try {
     const { id } = req.params;
@@ -154,7 +182,9 @@ router.patch('/:id/archiver', async (req, res) => {
   }
 });
 
-// ===== SUPPRIMER UN MESSAGE =====
+// ===========================================
+// SUPPRIMER UN MESSAGE (DELETE)
+// ===========================================
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -173,20 +203,6 @@ router.delete('/:id', async (req, res) => {
       message: error.message || 'Erreur serveur'
     });
   }
-});
-
-
-// Après avoir sauvegardé un nouveau message
-await nouveauMessage.save();
-
-// Émettre une notification aux destinataires
-nouveauMessage.destinataires.forEach(destinataireId => {
-  io.to(destinataireId.toString()).emit('nouveau-message', {
-    messageId: nouveauMessage._id,
-    expediteur: nouveauMessage.expediteur,
-    sujet: nouveauMessage.sujet,
-    date: nouveauMessage.dateEnvoi
-  });
 });
 
 module.exports = router;

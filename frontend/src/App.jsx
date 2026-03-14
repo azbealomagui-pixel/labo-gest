@@ -1,7 +1,7 @@
 // ===========================================
 // FICHIER: src/App.jsx
 // RÔLE: Configuration des routes principales
-// VERSION: Finale avec inscriptions et espace
+// VERSION: Finale avec toutes les routes
 // ===========================================
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -24,11 +24,9 @@ import GestionMembres from './pages/GestionMembres';
 import RapportForm from './pages/RapportForm';
 import Messagerie from './pages/Messagerie';
 import Abonnement from './pages/Abonnement';
-import { SocketProvider } from './context/SocketContext';
 
-
-
-
+// Providers
+import { SocketProvider } from './providers/SocketProvider';
 
 /**
  * Composant pour les routes protégées
@@ -66,13 +64,14 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           
           {/* ===== ROUTES PROTÉGÉES ===== */}
+          {/* Dashboard */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
           } />
           
-          {/* ===== GESTION DES PATIENTS ===== */}
+          {/* Patients */}
           <Route path="/patients" element={
             <ProtectedRoute>
               <Patients />
@@ -89,7 +88,7 @@ function App() {
             </ProtectedRoute>
           } />
           
-          {/* ===== GESTION DES ANALYSES ===== */}
+          {/* Analyses */}
           <Route path="/analyses" element={
             <ProtectedRoute>
               <Analyses />
@@ -106,14 +105,14 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* ===== FICHE D'ANALYSES PATIENT ===== */}
+          {/* Fiche d'analyses patient */}
           <Route path="/fiche-analyses/new" element={
             <ProtectedRoute>
               <FicheAnalyseForm />
             </ProtectedRoute>
           } />
           
-          {/* ===== GESTION DES DEVIS ===== */}
+          {/* Devis */}
           <Route path="/devis" element={
             <ProtectedRoute>
               <Devis />
@@ -130,10 +129,36 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* ===== CRÉATION D'ESPACE (après inscription) ===== */}
+          {/* Espaces et membres */}
           <Route path="/creer-espace" element={
             <ProtectedRoute>
               <CreerEspace />
+            </ProtectedRoute>
+          } />
+          <Route path="/membres" element={
+            <ProtectedRoute>
+              <GestionMembres />
+            </ProtectedRoute>
+          } />
+
+          {/* Rapports */}
+          <Route path="/rapport/:id" element={
+            <ProtectedRoute>
+              <RapportForm />
+            </ProtectedRoute>
+          } />
+
+          {/* Messagerie */}
+          <Route path="/messages" element={
+            <ProtectedRoute>
+              <Messagerie />
+            </ProtectedRoute>
+          } />
+
+          {/* Abonnement */}
+          <Route path="/abonnement" element={
+            <ProtectedRoute>
+              <Abonnement />
             </ProtectedRoute>
           } />
           
@@ -152,31 +177,6 @@ function App() {
               </div>
             </div>
           } />
-      
-        <Route path="/membres" element={
-          <ProtectedRoute>
-            <GestionMembres />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/rapport/:id" element={
-          <ProtectedRoute>
-            <RapportForm />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/messages" element={
-          <ProtectedRoute>
-            <Messagerie />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/abonnement" element={
-          <ProtectedRoute>
-            <Abonnement />
-          </ProtectedRoute>
-        } />
-        
         </Routes>
 
         {/* ===== FOOTER PROFESSIONNEL ===== */}
